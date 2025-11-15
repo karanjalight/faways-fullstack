@@ -1,0 +1,73 @@
+// Mock data for debt management demo
+import { Debt } from '../types/debt';
+
+// Generate some realistic mock debt data
+export const mockDebts: Debt[] = [
+  {
+    id: '1',
+    creditor: 'Credit Card Company A',
+    amount: 5000,
+    paidAmount: 1200,
+    dueDate: '2024-02-15',
+    status: 'pending',
+    description: 'Credit card balance from holiday expenses',
+    createdAt: '2024-01-10',
+    priority: 'high',
+  },
+  {
+    id: '2',
+    creditor: 'Student Loan Services',
+    amount: 25000,
+    paidAmount: 5000,
+    dueDate: '2024-03-01',
+    status: 'pending',
+    description: 'Federal student loan - monthly payment',
+    createdAt: '2024-01-05',
+    priority: 'high',
+  },
+  {
+    id: '3',
+    creditor: 'Medical Center',
+    amount: 3200,
+    paidAmount: 0,
+    dueDate: '2024-01-20',
+    status: 'overdue',
+    description: 'Emergency room visit - payment plan available',
+    createdAt: '2023-12-15',
+    priority: 'medium',
+  },
+  {
+    id: '4',
+    creditor: 'Auto Loan Finance',
+    amount: 15000,
+    paidAmount: 15000,
+    dueDate: '2024-01-10',
+    status: 'paid',
+    description: 'Car loan - fully paid off',
+    createdAt: '2023-11-01',
+    priority: 'low',
+  },
+  {
+    id: '5',
+    creditor: 'Utility Company',
+    amount: 450,
+    paidAmount: 0,
+    dueDate: '2024-02-05',
+    status: 'pending',
+    description: 'Electric and gas bill',
+    createdAt: '2024-01-25',
+    priority: 'medium',
+  },
+  {
+    id: '6',
+    creditor: 'Collection Agency XYZ',
+    amount: 1800,
+    paidAmount: 600,
+    dueDate: '2024-02-28',
+    status: 'negotiating',
+    description: 'Negotiating settlement for 50% of original amount',
+    createdAt: '2024-01-15',
+    priority: 'high',
+  },
+];
+
