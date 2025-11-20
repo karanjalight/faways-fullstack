@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import { isAuthenticated } from '../lib/auth';
 import DashboardLayout from '../components/DashboardLayout';
 import DataTable from '../components/DataTable';
+import AgentModal from '../components/AgentModal';
+import AgentDetailModal from '../components/AgentDetailModal';
 import { Agent } from '../types/agent';
 import { mockAgents } from '../data/mockAgents';
 
@@ -13,6 +15,10 @@ export default function AgentsPage() {
   const router = useRouter();
   const [agents, setAgents] = useState<Agent[]>(mockAgents);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
+  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
 
   // Check authentication on mount
   useEffect(() => {
@@ -83,6 +89,55 @@ export default function AgentsPage() {
     );
   };
 
+  // Handle view details
+  const handleViewDetails = (agent: Agent) => {
+    setSelectedAgent(agent);
+    setIsDetailModalOpen(true);
+  };
+
+  // Handle add new
+  const handleAddNew = () => {
+    setEditingAgent(null);
+    setIsModalOpen(true);
+  };
+
+  // Handle edit
+  const handleEdit = (agent: Agent) => {
+    setEditingAgent(agent);
+    setIsModalOpen(true);
+    setIsDetailModalOpen(false);
+  };
+
+  // Handle save
+  const handleSave = (agentData: Omit<Agent, 'id' | 'joinDate'>) => {
+    if (editingAgent) {
+      setAgents(
+        agents.map((a) =>
+          a.id === editingAgent.id
+            ? { ...agentData, id: editingAgent.id, joinDate: editingAgent.joinDate }
+            : a
+        )
+      );
+      setEditingAgent(null);
+    } else {
+      const newAgent: Agent = {
+        ...agentData,
+        id: Date.now().toString(),
+        joinDate: new Date().toISOString().split('T')[0],
+      };
+      setAgents([...agents, newAgent]);
+    }
+  };
+
+  // Handle delete
+  const handleDelete = () => {
+    if (selectedAgent && confirm('Are you sure you want to delete this agent?')) {
+      setAgents(agents.filter((a) => a.id !== selectedAgent.id));
+      setIsDetailModalOpen(false);
+      setSelectedAgent(null);
+    }
+  };
+
   const columns = [
     {
       header: 'Name',
@@ -137,6 +192,17 @@ export default function AgentsPage() {
         </span>
       ),
     },
+    {
+      header: 'Actions',
+      accessor: (agent: Agent) => (
+        <button
+          onClick={() => handleViewDetails(agent)}
+          className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+        >
+          View
+        </button>
+      ),
+    },
   ];
 
   if (!isAuthenticated()) {
@@ -155,7 +221,10 @@ export default function AgentsPage() {
                 Manage debt collection agents and their performance
               </p>
             </div>
-            <button className="rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+            <button
+              onClick={handleAddNew}
+              className="rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            >
               + Add Agent
             </button>
           </div>
@@ -170,6 +239,28 @@ export default function AgentsPage() {
             onSearch={setSearchQuery}
           />
         </div>
+
+        {/* Modals */}
+        <AgentModal
+          isOpen={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false);
+            setEditingAgent(null);
+          }}
+          onSave={handleSave}
+          editingAgent={editingAgent}
+        />
+
+        <AgentDetailModal
+          isOpen={isDetailModalOpen}
+          onClose={() => {
+            setIsDetailModalOpen(false);
+            setSelectedAgent(null);
+          }}
+          agent={selectedAgent}
+          onEdit={() => selectedAgent && handleEdit(selectedAgent)}
+          onDelete={handleDelete}
+        />
       </div>
     </DashboardLayout>
   );

@@ -4,6 +4,8 @@
 import { useState } from 'react';
 import { Debt, DebtStatus } from '../types/debt';
 import DebtCard from './DebtCard';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 interface DebtListProps {
   debts: Debt[];
@@ -21,24 +23,31 @@ export default function DebtList({
   const [filter, setFilter] = useState<DebtStatus | 'all'>('all');
   const [sortBy, setSortBy] = useState<'date' | 'amount' | 'priority'>('date');
   const [searchQuery, setSearchQuery] = useState('');
+  const [serviceLine, setServiceLine] = useState<'all' | string>('all');
 
-  // Filter debts based on status and search query
+  const uniqueServiceLines = Array.from(new Set(debts.map((debt) => debt.serviceLine)));
+
   const filteredDebts = debts
     .filter((debt) => {
       const matchesStatus = filter === 'all' || debt.status === filter;
+      const matchesService =
+        serviceLine === 'all' || debt.serviceLine.toLowerCase() === serviceLine.toLowerCase();
       const matchesSearch =
         searchQuery === '' ||
         debt.creditor.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        debt.description?.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesStatus && matchesSearch;
+        debt.patientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        debt.patientId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        debt.payer.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesStatus && matchesService && matchesSearch;
     })
     .sort((a, b) => {
       switch (sortBy) {
         case 'amount':
           return b.amount - a.amount;
-        case 'priority':
+        case 'priority': {
           const priorityOrder = { high: 3, medium: 2, low: 1 };
           return priorityOrder[b.priority] - priorityOrder[a.priority];
+        }
         case 'date':
         default:
           return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
@@ -46,59 +55,78 @@ export default function DebtList({
     });
 
   return (
-    <div className="space-y-4">
-      {/* Filters and search */}
-      <div className="flex flex-col gap-4 rounded-lg border border-gray-200 bg-white p-4 sm:flex-row">
-        {/* Search */}
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 rounded-3xl border border-slate-100 bg-white/80 p-5 shadow-sm lg:flex-row lg:items-center">
         <div className="flex-1">
-          <input
+          <Input
             type="text"
-            placeholder="Search by creditor or description..."
+            placeholder="Search client, patient ID, payer..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-md border border-gray-300 px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            className="h-12 rounded-2xl"
           />
         </div>
-
-        {/* Status filter */}
-        <select
-          value={filter}
-          onChange={(e) => setFilter(e.target.value as DebtStatus | 'all')}
-          className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-        >
-          <option value="all">All Status</option>
-          <option value="pending">Pending</option>
-          <option value="overdue">Overdue</option>
-          <option value="negotiating">Negotiating</option>
-          <option value="paid">Paid</option>
-        </select>
-
-        {/* Sort by */}
-        <select
-          value={sortBy}
-          onChange={(e) =>
-            setSortBy(e.target.value as 'date' | 'amount' | 'priority')
-          }
-          className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-        >
-          <option value="date">Sort by Date</option>
-          <option value="amount">Sort by Amount</option>
-          <option value="priority">Sort by Priority</option>
-        </select>
+        <div className="grid flex-1 grid-cols-2 gap-3 lg:flex lg:flex-1">
+          <select
+            value={filter}
+            onChange={(e) => setFilter(e.target.value as DebtStatus | 'all')}
+            className="h-12 rounded-2xl border border-slate-200 px-4 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="all">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="overdue">Overdue</option>
+            <option value="negotiating">Negotiating</option>
+            <option value="paid">Paid</option>
+          </select>
+          <select
+            value={serviceLine}
+            onChange={(e) => setServiceLine(e.target.value)}
+            className="h-12 rounded-2xl border border-slate-200 px-4 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="all">All Service Lines</option>
+            {uniqueServiceLines.map((line) => (
+              <option key={line} value={line}>
+                {line}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="grid grid-cols-2 gap-3 lg:w-64">
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as 'date' | 'amount' | 'priority')}
+            className="col-span-2 h-12 rounded-2xl border border-slate-200 px-4 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="date">Sort by Due Date</option>
+            <option value="amount">Sort by Amount</option>
+            <option value="priority">Sort by Priority</option>
+          </select>
+          <Button
+            variant="secondary"
+            className="col-span-2 h-12 rounded-2xl text-sm font-semibold"
+            onClick={() => {
+              setFilter('all');
+              setSortBy('date');
+              setSearchQuery('');
+              setServiceLine('all');
+            }}
+          >
+            Reset
+          </Button>
+        </div>
       </div>
 
-      {/* Results count */}
-      <div className="text-sm text-gray-600">
-        Showing {filteredDebts.length} of {debts.length} debts
+      <div className="text-sm text-slate-500">
+        Showing <span className="font-semibold text-slate-900">{filteredDebts.length}</span> of{' '}
+        {debts.length} open cases
       </div>
 
-      {/* Debt cards grid */}
       {filteredDebts.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-12 text-center">
-          <p className="text-gray-500">No debts found matching your criteria.</p>
+        <div className="rounded-3xl border border-dashed border-slate-200 bg-white/60 p-12 text-center">
+          <p className="text-sm text-slate-500">No cases match your filters.</p>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {filteredDebts.map((debt) => (
             <DebtCard
               key={debt.id}

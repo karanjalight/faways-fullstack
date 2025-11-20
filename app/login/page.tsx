@@ -45,7 +45,7 @@ export default function LoginPage() {
             </div>
           </div>
           <h2 className="mt-6 text-3xl font-bold tracking-tight text-gray-900">
-            Sign in to your account
+            Sign In 
           </h2>
           <p className="mt-2 text-sm text-gray-600">
             Or{' '}

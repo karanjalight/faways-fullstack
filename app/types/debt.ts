@@ -2,14 +2,35 @@
 
 export type DebtStatus = 'pending' | 'paid' | 'overdue' | 'negotiating';
 
+export type CollectionStage = 'new' | 'in-review' | 'escalated' | 'legal';
+
+export type DebtDocument = {
+  id: string;
+  name: string;
+  type: 'pdf' | 'image';
+  size: string;
+  uploadedAt: string;
+  uploadedBy: string;
+  url?: string;
+};
+
 export interface Debt {
   id: string;
-  creditor: string; // Name of the creditor/company
+  creditor: string; // Hospital, clinic or doctor group
+  clientType: 'hospital' | 'clinic' | 'practice';
+  patientName: string;
+  patientId: string;
+  serviceLine: string;
+  payer: string;
+  owner: string; // internal owner/collector
+  stage: CollectionStage;
   amount: number; // Total debt amount
   paidAmount: number; // Amount already paid
   dueDate: string; // ISO date string
   status: DebtStatus;
   description?: string; // Optional notes
+  documents?: DebtDocument[];
+  serviceDate?: string;
   createdAt: string; // When debt was added
   priority: 'low' | 'medium' | 'high'; // Priority level
 }

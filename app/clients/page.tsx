@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import { isAuthenticated } from '../lib/auth';
 import DashboardLayout from '../components/DashboardLayout';
 import DataTable from '../components/DataTable';
+import ClientModal from '../components/ClientModal';
+import ClientDetailModal from '../components/ClientDetailModal';
 import { Client } from '../types/client';
 import { mockClients } from '../data/mockClients';
 
@@ -13,6 +15,10 @@ export default function ClientsPage() {
   const router = useRouter();
   const [clients, setClients] = useState<Client[]>(mockClients);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
 
   // Check authentication on mount
   useEffect(() => {
@@ -93,6 +99,55 @@ export default function ClientsPage() {
     );
   };
 
+  // Handle view details
+  const handleViewDetails = (client: Client) => {
+    setSelectedClient(client);
+    setIsDetailModalOpen(true);
+  };
+
+  // Handle add new
+  const handleAddNew = () => {
+    setEditingClient(null);
+    setIsModalOpen(true);
+  };
+
+  // Handle edit
+  const handleEdit = (client: Client) => {
+    setEditingClient(client);
+    setIsModalOpen(true);
+    setIsDetailModalOpen(false);
+  };
+
+  // Handle save
+  const handleSave = (clientData: Omit<Client, 'id' | 'createdAt'>) => {
+    if (editingClient) {
+      setClients(
+        clients.map((c) =>
+          c.id === editingClient.id
+            ? { ...clientData, id: editingClient.id, createdAt: editingClient.createdAt }
+            : c
+        )
+      );
+      setEditingClient(null);
+    } else {
+      const newClient: Client = {
+        ...clientData,
+        id: Date.now().toString(),
+        createdAt: new Date().toISOString().split('T')[0],
+      };
+      setClients([...clients, newClient]);
+    }
+  };
+
+  // Handle delete
+  const handleDelete = () => {
+    if (selectedClient && confirm('Are you sure you want to delete this client?')) {
+      setClients(clients.filter((c) => c.id !== selectedClient.id));
+      setIsDetailModalOpen(false);
+      setSelectedClient(null);
+    }
+  };
+
   const columns = [
     {
       header: 'Client',
@@ -157,6 +212,17 @@ export default function ClientsPage() {
         </span>
       ),
     },
+    {
+      header: 'Actions',
+      accessor: (client: Client) => (
+        <button
+          onClick={() => handleViewDetails(client)}
+          className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+        >
+          View
+        </button>
+      ),
+    },
   ];
 
   if (!isAuthenticated()) {
@@ -175,7 +241,10 @@ export default function ClientsPage() {
                 Manage client relationships and debt information
               </p>
             </div>
-            <button className="rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+            <button
+              onClick={handleAddNew}
+              className="rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            >
               + Add Client
             </button>
           </div>
@@ -190,6 +259,28 @@ export default function ClientsPage() {
             onSearch={setSearchQuery}
           />
         </div>
+
+        {/* Modals */}
+        <ClientModal
+          isOpen={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false);
+            setEditingClient(null);
+          }}
+          onSave={handleSave}
+          editingClient={editingClient}
+        />
+
+        <ClientDetailModal
+          isOpen={isDetailModalOpen}
+          onClose={() => {
+            setIsDetailModalOpen(false);
+            setSelectedClient(null);
+          }}
+          client={selectedClient}
+          onEdit={() => selectedClient && handleEdit(selectedClient)}
+          onDelete={handleDelete}
+        />
       </div>
     </DashboardLayout>
   );
