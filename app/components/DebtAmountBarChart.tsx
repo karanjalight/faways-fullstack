@@ -11,22 +11,56 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
+import type { TooltipProps } from 'recharts';
+import type { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
 import { Debt, getRemainingAmount } from '../types/debt';
 
 interface DebtAmountBarChartProps {
   debts: Debt[];
 }
 
+interface DebtChartDatum {
+  name: string;
+  fullName: string;
+  Total: number;
+  Paid: number;
+  Remaining: number;
+}
+
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(value);
+
+const DebtAmountTooltip = ({
+  active,
+  payload,
+}: TooltipProps<ValueType, NameType>) => {
+  if (!active || !payload || payload.length === 0) {
+    return null;
+  }
+
+  const datum = payload[0]?.payload as DebtChartDatum | undefined;
+  if (!datum) {
+    return null;
+  }
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
+      <p className="mb-2 font-semibold text-gray-900">{datum.fullName}</p>
+      {payload.map((entry) => (
+        <p key={entry.name} className="text-sm" style={{ color: entry.color }}>
+          {entry?.name}: {formatCurrency(Number(entry?.value ?? 0))}
+        </p>
+      ))}
+    </div>
+  );
+};
+
 export default function DebtAmountBarChart({ debts }: DebtAmountBarChartProps) {
-  // Format currency for tooltip
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
 
   // Prepare data - show top 8 creditors by total amount
   const creditorData = debts.reduce(
@@ -56,7 +90,7 @@ export default function DebtAmountBarChart({ debts }: DebtAmountBarChartProps) {
   );
 
   // Convert to array, sort by total amount, and take top 8
-  const chartData = Object.values(creditorData)
+  const chartData: DebtChartDatum[] = Object.values(creditorData)
     .sort((a, b) => b.totalAmount - a.totalAmount)
     .slice(0, 8)
     .map((item) => ({
@@ -68,24 +102,6 @@ export default function DebtAmountBarChart({ debts }: DebtAmountBarChartProps) {
       Paid: item.paidAmount,
       Remaining: item.remainingAmount,
     }));
-
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
-          <p className="mb-2 font-semibold text-gray-900">
-            {payload[0].payload.fullName}
-          </p>
-          {payload.map((entry: any, index: number) => (
-            <p key={index} className="text-sm" style={{ color: entry.color }}>
-              {entry.name}: {formatCurrency(entry.value)}
-            </p>
-          ))}
-        </div>
-      );
-    }
-    return null;
-  };
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
@@ -109,7 +125,7 @@ export default function DebtAmountBarChart({ debts }: DebtAmountBarChartProps) {
             tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
             tick={{ fontSize: 12 }}
           />
-          <Tooltip content={<CustomTooltip />} />
+          <Tooltip content={<DebtAmountTooltip />} />
           <Legend />
           <Bar dataKey="Total" fill="#3b82f6" name="Total Amount" />
           <Bar dataKey="Paid" fill="#22c55e" name="Paid Amount" />

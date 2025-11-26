@@ -11,11 +11,63 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
+import type { TooltipProps } from 'recharts';
+import type { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
 import { Debt } from '../types/debt';
 
 interface PriorityBarChartProps {
   debts: Debt[];
 }
+
+interface PriorityChartDatum {
+  priority: string;
+  Count: number;
+  'Total Amount': number;
+  'Paid Amount': number;
+}
+
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(value);
+
+const PriorityTooltip = ({
+  active,
+  payload,
+}: TooltipProps<ValueType, NameType>) => {
+  if (!active || !payload || payload.length === 0) {
+    return null;
+  }
+
+  const datum = payload[0]?.payload as PriorityChartDatum | undefined;
+  if (!datum) {
+    return null;
+  }
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
+      <p className="mb-2 font-semibold text-gray-900">
+        {datum.priority} Priority
+      </p>
+      {payload.map((entry) => {
+        const value = Number(entry?.value ?? 0);
+        const label =
+          entry?.name === 'Count'
+            ? `${entry?.name}: ${value} debts`
+            : `${entry?.name}: ${formatCurrency(value)}`;
+
+        return (
+          <p key={entry?.name} className="text-sm" style={{ color: entry?.color }}>
+            {label}
+          </p>
+        );
+      })}
+    </div>
+  );
+};
 
 export default function PriorityBarChart({ debts }: PriorityBarChartProps) {
   // Calculate total amounts by priority
@@ -39,7 +91,7 @@ export default function PriorityBarChart({ debts }: PriorityBarChartProps) {
     >
   );
 
-  const chartData = [
+  const chartData: PriorityChartDatum[] = [
     {
       priority: 'High',
       Count: priorityData.high?.count || 0,
@@ -59,35 +111,6 @@ export default function PriorityBarChart({ debts }: PriorityBarChartProps) {
       'Paid Amount': priorityData.low?.paidAmount || 0,
     },
   ];
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
-
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
-          <p className="mb-2 font-semibold text-gray-900">
-            {payload[0].payload.priority} Priority
-          </p>
-          {payload.map((entry: any, index: number) => (
-            <p key={index} className="text-sm" style={{ color: entry.color }}>
-              {entry.name === 'Count'
-                ? `${entry.name}: ${entry.value} debts`
-                : `${entry.name}: ${formatCurrency(entry.value)}`}
-            </p>
-          ))}
-        </div>
-      );
-    }
-    return null;
-  };
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
@@ -113,7 +136,7 @@ export default function PriorityBarChart({ debts }: PriorityBarChartProps) {
             tick={{ fontSize: 12 }}
             tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
           />
-          <Tooltip content={<CustomTooltip />} />
+          <Tooltip content={<PriorityTooltip />} />
           <Legend />
           <Bar
             yAxisId="left"

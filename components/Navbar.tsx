@@ -5,6 +5,21 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, Menu, X } from "lucide-react";
 
+const primaryLinks = [
+  { href: "/", label: "Home" },
+  { href: "/about", label: "About" },
+  { href: "/services", label: "Services" },
+  { href: "/case-studies", label: "Case Studies" },
+  { href: "/careers", label: "Careers" },
+  { href: "/contact", label: "Contact" },
+];
+
+const solutionShortcuts = [
+  { name: "Revenue Recovery", href: "/services#revenue" },
+  { name: "Provider Enablement", href: "/services#enablement" },
+  { name: "Data & Insights", href: "/services#data" },
+];
+
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
@@ -60,36 +75,26 @@ export default function Navbar() {
         </Link>
 
         {/* Desktop Nav */}
-        <div className="hidden lg:flex items-center gap-8 text-sm relative"></div>
-
-        {/* Right Side Actions */}
-        <div className="flex items-center gap-2 sm:gap-8">
-          <NavLink href="/" label="Home" isScrolled={isScrolled} />
-
-          <NavLink href="/about" label="About Us" isScrolled={isScrolled} />
-
+        <div className="hidden lg:flex items-center gap-6 text-sm">
+          {primaryLinks.map((link) => (
+            <NavLink
+              key={link.href}
+              href={link.href}
+              label={link.label}
+              isScrolled={isScrolled}
+            />
+          ))}
           <Dropdown
-            label="Services"
-            items={[
-              {
-                name: "Household Staffing",
-                href: "/about#household",
-              },
-              {
-                name: "Pharma & Corporate Training",
-                href: "/about#training",
-              },
-              {
-                name: "Performance Analytics",
-                href: "/about#analytics",
-              },
-            ]}
+            label="Solutions"
+            items={solutionShortcuts}
             activeDropdown={activeDropdown}
             toggleDropdown={toggleDropdown}
             isScrolled={isScrolled}
           />
+        </div>
 
-          <NavLink href="/contact" label="Contact" isScrolled={isScrolled} />
+        {/* Right Side Actions */}
+        <div className="flex items-center gap-2 sm:gap-4">
           <Link
             href={"/login"}
             className="relative hidden font-normal lg:inline-flex items-center justify-center gap-2 px-6 py-3 border border-purple-500-400 bg-sky-600   overflow-hidden transition-all duration-500 hover:text-gray-800 hover:border-purple-500-600 before:absolute before:inset-0 before:bg-[#02273f] before:w-0 hover:before:w-full before:transition-all before:duration-500 before:rotate-45 before:-translate-x-1/2 before:-translate-y-1/2 before:origin-center before:top-1/2 before:left-1/2 before:h-[500%] before:z-0"
@@ -97,7 +102,7 @@ export default function Navbar() {
             <span className="relative z-10 text-white">Login →</span>
           </Link>
           <Link
-            href={"/login"}
+            href={"/contact"}
             className="relative hidden font-normal lg:inline-flex items-center justify-center gap-2 px-6 py-3 border border-purple-500-400 bg-sky-600   overflow-hidden transition-all duration-500 hover:text-gray-800 hover:border-purple-500-600 before:absolute before:inset-0 before:bg-[#02273f] before:w-0 hover:before:w-full before:transition-all before:duration-500 before:rotate-45 before:-translate-x-1/2 before:-translate-y-1/2 before:origin-center before:top-1/2 before:left-1/2 before:h-[500%] before:z-0"
           >
             <span className="relative z-10 text-white">Get Started →</span>
@@ -143,39 +148,21 @@ export default function Navbar() {
               </div>
             </div>
             <div className="px-4 py-6 space-y-4">
-              <MobileNavLink href="/" label="Home" onClick={closeMobileMenu} />
-
-              <MobileNavLink
-                href="/about"
-                label="About Us"
-                onClick={closeMobileMenu}
-              />
+              {primaryLinks.map((link) => (
+                <MobileNavLink
+                  key={link.href}
+                  href={link.href}
+                  label={link.label}
+                  onClick={closeMobileMenu}
+                />
+              ))}
 
               <MobileDropdown
-                label="Services"
-                items={[
-                  {
-                    name: "Household Staffing",
-                    href: "/about#household",
-                  },
-                  {
-                    name: "Pharma & Corporate Training",
-                    href: "/about#training",
-                  },
-                  {
-                    name: "Performance Analytics",
-                    href: "/about#analytics",
-                  },
-                ]}
+                label="Solutions"
+                items={solutionShortcuts}
                 activeDropdown={activeDropdown}
                 toggleDropdown={toggleDropdown}
                 closeMobileMenu={closeMobileMenu}
-              />
-
-              <MobileNavLink
-                href="/contact"
-                label="Contact"
-                onClick={closeMobileMenu}
               />
 
               <div className="pt-4">

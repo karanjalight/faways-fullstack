@@ -9,7 +9,7 @@ const TestimonialsSection = () => {
     {
       id: 1,
       name: "Sarah Mwangi",
-      text: "Faways Solutions helped us recover outstanding debts quickly and professionally. Their 'No Win, No Fee' approach gave us confidence, and we got results without affecting our reputation.",
+      text: "Faways Solutions helped us recover outstanding debts quickly and professionally. Their “No Win, No Fee” approach gave us confidence, and we got results without affecting our reputation.",
       rating: 5,
       role: "Small Business Owner",
       image: "https://ui-avatars.com/api/?name=Sarah+Mwangi&background=b38f62&color=fff&size=128",
@@ -17,7 +17,7 @@ const TestimonialsSection = () => {
     {
       id: 2,
       name: "James Ochieng",
-      text: "The property management team at Faways Solutions ensures timely rent collection and handles all tenant interactions seamlessly. It's made managing my rental properties effortless.",
+      text: "The property management team at Faways Solutions ensures timely rent collection and handles all tenant interactions seamlessly. It’s made managing my rental properties effortless.",
       rating: 5,
       role: "Landlord",
       image: "https://ui-avatars.com/api/?name=James+Ochieng&background=02273f&color=fff&size=128",
@@ -33,7 +33,7 @@ const TestimonialsSection = () => {
     {
       id: 4,
       name: "David Kimani",
-      text: "Faways' credit control consultancy transformed how we manage client credit. Bad debts decreased and cash flow improved. Their personalized approach works!",
+      text: "Faways’ credit control consultancy transformed how we manage client credit. Bad debts decreased and cash flow improved. Their personalized approach works!",
       rating: 5,
       role: "Finance Manager",
       image: "https://ui-avatars.com/api/?name=David+Kimani&background=02273f&color=fff&size=128",
@@ -78,7 +78,7 @@ const TestimonialsSection = () => {
             What Our Customers Say
           </h2>
           <p className="text-gray-600 text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
-            Here's what our clients say about working with Faways Solutions in debt management, property management, and financial consultancy.
+            Here’s what our clients say about working with Faways Solutions in debt management, property management, and financial consultancy.
           </p>
         </div>
 
@@ -111,7 +111,7 @@ const TestimonialsSection = () => {
                 </div>
 
                 <p className="text-gray-700 text-base leading-relaxed mb-6 line-clamp-4 group-hover:line-clamp-none transition-all">
-                  "{testimonial.text}"
+                  “{testimonial.text}”
                 </p>
 
                 <div className="flex items-center gap-4 pt-6 border-t border-gray-100">

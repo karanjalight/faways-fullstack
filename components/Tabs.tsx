@@ -4,40 +4,10 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
-// Example SVG icons (replace with real ones if you have)
-const DebtIcon = () => (
-  <svg className="w-full h-full" viewBox="0 0 64 64" fill="none">
-    <circle cx="32" cy="32" r="30" fill="#b38f62" opacity="0.3" />
-    <path d="M16 32H48" stroke="white" strokeWidth="3" strokeLinecap="round" />
-  </svg>
-);
-
-const PropertyIcon = () => (
-  <svg className="w-full h-full" viewBox="0 0 64 64" fill="none">
-    <rect x="16" y="24" width="32" height="28" rx="2" fill="#02273f" opacity="0.3"/>
-    <path d="M32 12L16 24H48L32 12Z" fill="#02273f"/>
-  </svg>
-);
-
-const BookkeepingIcon = () => (
-  <svg className="w-full h-full" viewBox="0 0 64 64" fill="none">
-    <rect x="16" y="16" width="32" height="32" rx="4" fill="#7C3AED" opacity="0.3"/>
-    <path d="M24 24H40M24 32H40M24 40H40" stroke="white" strokeWidth="2" strokeLinecap="round"/>
-  </svg>
-);
-
-const CreditIcon = () => (
-  <svg className="w-full h-full" viewBox="0 0 64 64" fill="none">
-    <circle cx="32" cy="32" r="28" fill="#f97316" opacity="0.3"/>
-    <path d="M24 32H40M32 24V40" stroke="white" strokeWidth="3" strokeLinecap="round"/>
-  </svg>
-);
-
 interface Service {
   id: number;
   title: string;
   color: string;
-  icon: any;
   image: string;
   gradient: string;
   slug: string;
@@ -51,7 +21,6 @@ export default function FawaysServices() {
       id: 1,
       title: "Debt Collection & Recovery",
       color: "Debt Management",
-      icon: DebtIcon,
       image: "/trained-security-guard-pointing-his-baton-against-blue-background.jpg",
       gradient: "from-sky-700/30 to-sky-900/50",
       slug: "services/debt-collection",
@@ -60,7 +29,6 @@ export default function FawaysServices() {
       id: 2,
       title: "Rent Collection & Property Management",
       color: "Property",
-      icon: PropertyIcon,
       image: "/portrait-menacing-bodyguard-pointing-towards-security-body-camera.jpg",
       gradient: "from-sky-700/30 to-sky-900/50",
       slug: "services/property-management",
@@ -69,7 +37,6 @@ export default function FawaysServices() {
       id: 3,
       title: "Bookkeeping & Financial Management",
       color: "Financial",
-      icon: BookkeepingIcon,
       image: "/african-business-male-people-shaking-hands.jpg",
       gradient: "from-sky-700/30 to-sky-900/50",
       slug: "services/bookkeeping-financial",
@@ -78,7 +45,6 @@ export default function FawaysServices() {
       id: 4,
       title: "Credit Control & Consultancy",
       color: "Credit Consultancy",
-      icon: CreditIcon,
       image: "/server-hub-it-staff-members-debugging-optimizing-code.jpg",
       gradient: "from-sky-700/30 to-sky-900/50",
       slug: "services/credit-control",

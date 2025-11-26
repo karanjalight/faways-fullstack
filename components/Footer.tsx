@@ -2,10 +2,8 @@
 
 import React, { useState } from "react";
 import {
-  Facebook,
   Instagram,
   Linkedin,
-  Youtube,
   Phone,
   Mail,
   MapPin,
@@ -31,24 +29,24 @@ const Footer = () => {
   const quickLinks = [
     { name: "Home", href: "/" },
     { name: "About Us", href: "/about" },
-    { name: "Household Staffing", href: "/about#household" },
-    { name: "Pharma Training", href: "/about#training" },
-    { name: "Contact Us", href: "/contact" },
+    { name: "Services", href: "/services" },
+    { name: "Case Studies", href: "/case-studies" },
+    { name: "Careers", href: "/careers" },
   ];
 
   const pages = [
-    { name: "Home", href: "/" },
-    { name: "About Us", href: "/about" },
-    { name: "Our Services", href: "/about" },
-    { name: "Contact Us", href: "/contact" },
+    { name: "Contact", href: "/contact" },
+    { name: "Client Login", href: "/login" },
+    { name: "Collections Dashboard", href: "/dashboard" },
+    { name: "Documents", href: "/documents" },
   ];
 
   const services = [
-    { name: "Backup Nannies", href: "/about#household" },
-    { name: "Contract Nannies", href: "/about#household" },
-    { name: "Pharma Training", href: "/about#training" },
-    { name: "Performance Analytics", href: "/about#analytics" },
-    { name: "Corporate Solutions", href: "/about#training" },
+    { name: "Revenue Recovery", href: "/services#revenue" },
+    { name: "Provider Enablement", href: "/services#enablement" },
+    { name: "Data & Insights", href: "/services#data" },
+    { name: "Collections Advisory", href: "/services#advisory" },
+    { name: "Training Labs", href: "/services#labs" },
   ];
 
   return (

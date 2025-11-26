@@ -22,7 +22,7 @@ export default function HeroSection() {
     }, 8000); // Change image every 5 seconds
 
     return () => clearInterval(interval);
-  }, []);
+  }, [backgroundImages.length]);
 
   return (
     <section className="relative flex lg:h-[80vh] h-[60vh] flex-col md:flex-row items-center lg:justify-between px-6 sm:px-10 md:px-20 py-16 md:py-20 text-white overflow-hidden">
@@ -100,7 +100,7 @@ export default function HeroSection() {
           Peckers <span className="text-purple-400">Services</span>{" "}
         </h1>
         <p className="text-white font-light text-sm px-6">
-          Kenya's first fully integrated provider of Household Support and
+          Kenya’s first fully integrated provider of Household Support and
           Corporate Productivity Solutions. Trust, continuity, and world-class
           professionalism.
         </p>
