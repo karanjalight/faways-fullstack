@@ -1,5 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
+
+function notConfigured() {
+  return NextResponse.json(
+    {
+      error:
+        'Database is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SERVICE_ROLE_KEY to your environment.',
+    },
+    { status: 503 },
+  );
+}
 
 // Helper to generate a random password
 function generatePassword(length = 16) {
@@ -13,6 +23,9 @@ function generatePassword(length = 16) {
 }
 
 export async function GET() {
+  const supabaseAdmin = getSupabaseAdmin();
+  if (!supabaseAdmin) return notConfigured();
+
   // Fetch clients with simple aggregates from debts
   const { data, error } = await supabaseAdmin
     .from('clients')
@@ -62,6 +75,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const supabaseAdmin = getSupabaseAdmin();
+  if (!supabaseAdmin) return notConfigured();
+
   const body = await req.json();
   const { clientName, contactName, email, phone, region } = body as {
     clientName: string;
