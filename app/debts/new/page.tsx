@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '../../components/DashboardLayout';
 import { Debt, DebtStatus } from '../../types/debt';
+import { getCurrentUser } from '../../lib/auth';
 import { createDebt } from '../../lib/debts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -50,7 +51,7 @@ interface FormState {
 
 export default function NewDebtPage() {
   const router = useRouter();
-  const user = null;
+  const user = getCurrentUser();
 
   const [step, setStep] = useState<Step>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
