@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '../../components/DashboardLayout';
 import { Debt, DebtStatus } from '../../types/debt';
+import { Client } from '../../types/client';
 import { getCurrentUser } from '../../lib/auth';
 import { createDebt } from '../../lib/debts';
+import { createClientApi, fetchClientByEmail, fetchClients } from '../../lib/clients';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -13,31 +15,54 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 
 type Step = 1 | 2;
+type DebtSource =
+  | 'hospital-intake'
+  | 'newspaper-lead'
+  | 'client-referral'
+  | 'contact-us-lead';
+type DebtorKind = 'patient' | 'non-patient';
 
 const serviceLines = [
+  'General Recovery',
+  'Debt Collection & Recovery',
+  'Rent Collection & Property Management',
+  'Bookkeeping & Financial Management',
+  'Credit Control & Consultancy',
   'Cardiology',
   'Orthopedics',
   'Oncology',
   'Trauma',
   'Radiology',
   'Pediatrics',
+  'Newspaper Lead',
 ];
 
 const owners = ['Nia Patel', 'Marcus Ochieng', 'Faith Kim', 'Grace Ahmed'];
 
 const clientTypes: { label: string; value: Debt['clientType'] }[] = [
-  { label: 'Hospital', value: 'hospital' },
-  { label: 'Clinic', value: 'clinic' },
-  { label: 'Specialty Practice', value: 'practice' },
+  { label: 'Business', value: 'hospital' },
+  { label: 'Property / SME', value: 'clinic' },
+  { label: 'Enterprise / Corporate', value: 'practice' },
 ];
 
+const fawaysContact = {
+  phones: ['0735 343000', '0729 806 234'],
+  email: 'info@fawaysolutions.co.ke',
+};
+
 interface FormState {
+  debtSource: DebtSource;
+  debtorKind: DebtorKind;
+  assignedClientId: string;
   creditor: string;
   clientType: Debt['clientType'];
   patientName: string;
   patientId: string;
   serviceLine: string;
   payer: string;
+  contactEmail: string;
+  contactPhone: string;
+  createTrackingAccount: boolean;
   owner: string;
   stage: Debt['stage'];
   amount: string;
@@ -52,16 +77,28 @@ interface FormState {
 export default function NewDebtPage() {
   const router = useRouter();
   const user = getCurrentUser();
+  const [createdCredentials, setCreatedCredentials] = useState<{
+    email: string;
+    password: string;
+  } | null>(null);
 
   const [step, setStep] = useState<Step>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [clientOptions, setClientOptions] = useState<Client[]>([]);
+  const [isLoadingClients, setIsLoadingClients] = useState(false);
   const [formData, setFormData] = useState<FormState>({
+    debtSource: 'hospital-intake',
+    debtorKind: 'patient',
+    assignedClientId: '',
     creditor: '',
     clientType: 'hospital',
     patientName: '',
     patientId: '',
-    serviceLine: serviceLines[0],
+    serviceLine: 'General Recovery',
     payer: '',
+    contactEmail: '',
+    contactPhone: '',
+    createTrackingAccount: false,
     owner: owners[0],
     stage: 'new',
     amount: '',
@@ -73,14 +110,49 @@ export default function NewDebtPage() {
     description: '',
   });
 
+  useEffect(() => {
+    const loadClients = async () => {
+      setIsLoadingClients(true);
+      try {
+        const data = await fetchClients();
+        setClientOptions(data.filter((client) => client.status === 'active'));
+      } catch (error) {
+        console.error(error);
+        setClientOptions([]);
+      } finally {
+        setIsLoadingClients(false);
+      }
+    };
+    loadClients();
+  }, []);
+
   const goNext = () => {
     if (step === 1) {
-      if (!formData.creditor || !formData.patientName || !formData.patientId) {
-        alert('Please fill in client and patient details.');
+      const isNewspaperLead = formData.debtSource === 'newspaper-lead';
+      const isContactLead = formData.debtSource === 'contact-us-lead';
+      const requiresPatientFields = formData.debtorKind === 'patient' && !isNewspaperLead;
+      if (!formData.creditor) {
+        alert('Please add the client name.');
         return;
       }
-      if (!formData.payer || !formData.serviceLine) {
-        alert('Please specify service line and payer.');
+      if (!formData.serviceLine) {
+        alert('Please specify the service line.');
+        return;
+      }
+      if (requiresPatientFields && (!formData.patientName || !formData.patientId)) {
+        alert('Please fill patient and payer details for this debt source.');
+        return;
+      }
+      if (!isNewspaperLead && !isContactLead && !formData.payer) {
+        alert('Please add payer details for this debt source.');
+        return;
+      }
+      if (
+        (isNewspaperLead || isContactLead) &&
+        formData.createTrackingAccount &&
+        !formData.contactEmail.trim()
+      ) {
+        alert('Client email is required to create a tracking account.');
         return;
       }
       setStep(2);
@@ -115,30 +187,97 @@ export default function NewDebtPage() {
     }
 
     setIsSubmitting(true);
+    setCreatedCredentials(null);
 
     try {
-    const now = new Date().toISOString();
+      let linkedClientId: string | undefined = formData.assignedClientId || undefined;
+      let linkedExistingClient = false;
+      const shouldCreateTrackingAccount =
+        (formData.debtSource === 'newspaper-lead' ||
+          formData.debtSource === 'contact-us-lead') &&
+        formData.createTrackingAccount;
+      const normalizedEmail = formData.contactEmail.trim().toLowerCase();
 
-    await createDebt({
-      creditor: formData.creditor,
-      clientType: formData.clientType,
-      patientName: formData.patientName,
-      patientId: formData.patientId,
-      serviceLine: formData.serviceLine,
-      payer: formData.payer,
-      owner: formData.owner,
-      stage: formData.stage,
-      amount,
-      paidAmount,
-      dueDate: formData.dueDate,
-      status: formData.status,
-      description: formData.description || undefined,
-      documents: [],
-      serviceDate: formData.serviceDate || now.slice(0, 10),
-      priority: formData.priority,
-    });
+      if (!linkedClientId && normalizedEmail) {
+        const existingClient = await fetchClientByEmail(normalizedEmail);
+        if (existingClient) {
+          linkedClientId = existingClient.id;
+          linkedExistingClient = true;
+        }
+      }
 
-    router.push('/debts');
+      if (shouldCreateTrackingAccount && !linkedClientId) {
+        const { client, credentials } = await createClientApi({
+          clientName: formData.creditor,
+          contactName: formData.creditor,
+          email: normalizedEmail,
+          phone: formData.contactPhone.trim() || undefined,
+          region:
+            formData.debtSource === 'contact-us-lead'
+              ? 'Contact Us lead'
+              : 'Newspaper lead',
+        });
+        linkedClientId = client.id;
+        setCreatedCredentials(credentials);
+      }
+
+      const now = new Date().toISOString();
+      const generatedLeadId = `LEAD-${Date.now().toString().slice(-6)}`;
+      const sourceLabel =
+        formData.debtSource === 'newspaper-lead'
+          ? 'Newspaper lead'
+          : formData.debtSource === 'contact-us-lead'
+            ? 'Contact Us lead'
+          : formData.debtSource === 'client-referral'
+            ? 'Client referral'
+            : 'Hospital intake';
+      const baseNotes = formData.description?.trim() ?? '';
+      const sourceNotes = [
+        `Source: ${sourceLabel}`,
+        linkedClientId ? `Assigned client account ID: ${linkedClientId}` : null,
+        formData.contactEmail.trim()
+          ? `Client contact email: ${formData.contactEmail.trim()}`
+          : null,
+        shouldCreateTrackingAccount
+          ? 'Tracking account created for this client.'
+          : null,
+        linkedExistingClient
+          ? 'Linked to an existing client account for tracking.'
+          : null,
+        formData.debtSource === 'contact-us-lead'
+          ? `Captured via Contact Us: ${fawaysContact.phones.join(' / ')} | ${fawaysContact.email}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join('\n');
+
+      await createDebt({
+        clientId: linkedClientId,
+        creditor: formData.creditor,
+        clientType: formData.clientType,
+        patientName: formData.patientName.trim() || formData.creditor,
+        patientId: formData.patientId.trim() || generatedLeadId,
+        serviceLine: formData.serviceLine,
+        payer:
+          formData.payer.trim() ||
+          (formData.debtSource === 'newspaper-lead' ||
+          formData.debtSource === 'contact-us-lead'
+            ? 'Self-reported lead'
+            : 'Not provided'),
+        owner: formData.owner,
+        stage: formData.stage,
+        amount,
+        paidAmount,
+        dueDate: formData.dueDate,
+        status: formData.status,
+        description:
+          [baseNotes, sourceNotes].filter(Boolean).join('\n\n') || undefined,
+        documents: [],
+        serviceDate: formData.serviceDate || now.slice(0, 10),
+        priority: formData.priority,
+      });
+
+      router.push('/debts');
     } catch {
       alert('Something went wrong while creating the debt. Please try again.');
       setIsSubmitting(false);
@@ -152,11 +291,11 @@ export default function NewDebtPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs uppercase tracking-wide text-slate-500">
-                Create new healthcare debt
+                Create new debt case
               </p>
               <h1 className="text-3xl font-bold text-slate-900">New Debt Workflow</h1>
               <p className="mt-1 text-sm text-slate-500">
-                Capture client, patient, payer, and financial details in two guided steps.
+                Capture business or patient debt details in two guided steps.
               </p>
             </div>
             <div className="hidden sm:flex flex-col items-end gap-1">
@@ -178,7 +317,7 @@ export default function NewDebtPage() {
               </div>
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">
-                  Client & Patient
+                  Client & Debtor
                 </p>
                 <p className="text-[11px] text-slate-500">Who and where the debt originates</p>
               </div>
@@ -209,10 +348,10 @@ export default function NewDebtPage() {
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <h2 className="text-base font-semibold text-slate-900">
-                      Client & patient context
+                      Client & debtor context
                     </h2>
                     <p className="text-xs text-slate-500">
-                      Map the healthcare client, patient identity, and payer before financials.
+                      Record whether this is a patient case or a normal business/client debt.
                     </p>
                   </div>
                   <Badge variant="secondary" className="rounded-full px-3 py-1 text-[11px]">
@@ -221,20 +360,138 @@ export default function NewDebtPage() {
                 </div>
 
                 <div className="space-y-4 rounded-2xl bg-slate-50/80 p-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <Label>Debt Source</Label>
+                      <select
+                        value={formData.debtSource}
+                        onChange={(e) => {
+                          const nextSource = e.target.value as DebtSource;
+                          setFormData((prev) => ({
+                            ...prev,
+                            debtSource: nextSource,
+                            serviceLine:
+                              nextSource === 'newspaper-lead'
+                                ? 'Newspaper Lead'
+                                : prev.serviceLine === 'Newspaper Lead'
+                                  ? 'General Recovery'
+                                  : prev.serviceLine,
+                            createTrackingAccount:
+                              nextSource === 'newspaper-lead'
+                                ? prev.createTrackingAccount
+                                : false,
+                          }));
+                        }}
+                        className="mt-1 h-11 w-full rounded-2xl border border-slate-200 px-4 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="hospital-intake">Hospital intake</option>
+                        <option value="newspaper-lead">Newspaper lead</option>
+                        <option value="contact-us-lead">Contact Us lead</option>
+                        <option value="client-referral">Client referral</option>
+                      </select>
+                    </div>
+                    {(formData.debtSource === 'newspaper-lead' ||
+                      formData.debtSource === 'contact-us-lead') && (
+                      <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-700">
+                        Lead case detected. Use minimal intake, then optionally create a tracking
+                        account for this client.
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Is this a patient debt?</Label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFormData((prev) => ({ ...prev, debtorKind: 'patient' }))
+                        }
+                        className={`h-11 rounded-2xl border text-sm font-medium ${
+                          formData.debtorKind === 'patient'
+                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            : 'border-slate-200 bg-white text-slate-700'
+                        }`}
+                      >
+                        Yes, patient case
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            debtorKind: 'non-patient',
+                            patientId: prev.patientId,
+                          }))
+                        }
+                        className={`h-11 rounded-2xl border text-sm font-medium ${
+                          formData.debtorKind === 'non-patient'
+                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            : 'border-slate-200 bg-white text-slate-700'
+                        }`}
+                      >
+                        No, business/client debt
+                      </button>
+                    </div>
+                  </div>
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                    Healthcare client
+                    Client details
                   </p>
+                  <div className="space-y-2">
+                    <Label>Assign to Existing Client Account</Label>
+                    <select
+                      value={formData.assignedClientId}
+                      onChange={(e) => {
+                        const selectedId = e.target.value;
+                        const selectedClient = clientOptions.find(
+                          (client) => client.id === selectedId,
+                        );
+                        setFormData((prev) => ({
+                          ...prev,
+                          assignedClientId: selectedId,
+                          creditor:
+                            selectedClient?.name && !prev.creditor
+                              ? selectedClient.name
+                              : prev.creditor,
+                          contactEmail:
+                            selectedClient?.email && !prev.contactEmail
+                              ? selectedClient.email
+                              : prev.contactEmail,
+                          contactPhone:
+                            selectedClient?.phone && !prev.contactPhone
+                              ? selectedClient.phone
+                              : prev.contactPhone,
+                        }));
+                      }}
+                      disabled={isLoadingClients}
+                      className="h-11 w-full rounded-2xl border border-slate-200 px-4 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">
+                        {isLoadingClients
+                          ? 'Loading client accounts...'
+                          : 'Unassigned (manual/new client)'}
+                      </option>
+                      {clientOptions.map((client) => (
+                        <option key={client.id} value={client.id}>
+                          {client.name} ({client.email || 'No email'})
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[11px] text-slate-500">
+                      Select a client account so this debt appears directly in that user&apos;s
+                      portal.
+                    </p>
+                  </div>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
                       <Label>
-                        Healthcare Client <span className="text-rose-500">*</span>
+                        Client Name <span className="text-rose-500">*</span>
                       </Label>
                       <Input
                         value={formData.creditor}
                         onChange={(e) =>
                           setFormData((prev) => ({ ...prev, creditor: e.target.value }))
                         }
-                        placeholder="e.g. Mercy General Hospital"
+                        placeholder="e.g. Karanja Traders"
                         required
                       />
                     </div>
@@ -263,28 +520,54 @@ export default function NewDebtPage() {
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label>
-                      Patient Name <span className="text-rose-500">*</span>
+                        {formData.debtorKind === 'patient'
+                          ? 'Patient Name'
+                          : 'Debtor Name'}
+                        {(formData.debtSource !== 'newspaper-lead' ||
+                          formData.debtorKind === 'non-patient') && (
+                          <span className="text-rose-500"> *</span>
+                        )}
                     </Label>
                     <Input
                       value={formData.patientName}
                       onChange={(e) =>
                         setFormData((prev) => ({ ...prev, patientName: e.target.value }))
                       }
-                      placeholder="Full name on claim"
-                      required
+                      placeholder={
+                        formData.debtorKind === 'patient'
+                          ? 'Full name on claim'
+                          : 'Person or company that owes'
+                      }
+                      required={
+                        formData.debtorKind === 'non-patient' ||
+                        formData.debtSource !== 'newspaper-lead'
+                      }
                     />
                   </div>
                   <div className="space-y-2">
                     <Label>
-                      Patient ID / MRN <span className="text-rose-500">*</span>
+                      {formData.debtorKind === 'patient'
+                        ? 'Patient ID / MRN'
+                        : 'Reference ID'}
+                      {formData.debtorKind === 'patient' &&
+                        formData.debtSource !== 'newspaper-lead' && (
+                        <span className="text-rose-500"> *</span>
+                      )}
                     </Label>
                     <Input
                       value={formData.patientId}
                       onChange={(e) =>
                         setFormData((prev) => ({ ...prev, patientId: e.target.value }))
                       }
-                      placeholder="e.g. MRN-88421"
-                      required
+                      placeholder={
+                        formData.debtorKind === 'patient'
+                          ? 'e.g. MRN-88421'
+                          : 'e.g. INVOICE-208'
+                      }
+                      required={
+                        formData.debtorKind === 'patient' &&
+                        formData.debtSource !== 'newspaper-lead'
+                      }
                     />
                   </div>
                   <div className="space-y-2">
@@ -307,18 +590,110 @@ export default function NewDebtPage() {
                   </div>
                   <div className="space-y-2">
                     <Label>
-                      Payer / Insurance <span className="text-rose-500">*</span>
+                      Payer / Insurance
+                      {formData.debtorKind === 'patient' &&
+                        formData.debtSource !== 'newspaper-lead' && (
+                        <span className="text-rose-500"> *</span>
+                      )}
                     </Label>
                     <Input
                       value={formData.payer}
                       onChange={(e) =>
                         setFormData((prev) => ({ ...prev, payer: e.target.value }))
                       }
-                      placeholder="e.g. BlueCross PPO"
-                      required
+                      placeholder={
+                        formData.debtorKind === 'patient'
+                          ? 'e.g. BlueCross PPO or self-reported'
+                          : 'e.g. Corporate account / direct debtor'
+                      }
+                      required={
+                        formData.debtorKind === 'patient' &&
+                        formData.debtSource !== 'newspaper-lead'
+                      }
                     />
                   </div>
                 </div>
+
+                {(formData.debtSource === 'newspaper-lead' ||
+                  formData.debtSource === 'contact-us-lead') && (
+                  <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    {formData.debtSource === 'contact-us-lead' && (
+                      <div className="rounded-xl bg-white px-3 py-2 text-xs text-slate-600">
+                        Contact line: {fawaysContact.phones.join(' / ')} | {fawaysContact.email}
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-800">
+                          Client tracking account
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          Create login credentials so this client can track their debt status.
+                        </p>
+                      </div>
+                      <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={formData.createTrackingAccount}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              createTrackingAccount: e.target.checked,
+                            }))
+                          }
+                          className="h-4 w-4 rounded border-slate-300"
+                        />
+                        Enable account
+                      </label>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>
+                          Client Email
+                          {formData.createTrackingAccount && (
+                            <span className="text-rose-500"> *</span>
+                          )}
+                        </Label>
+                        <Input
+                          type="email"
+                          value={formData.contactEmail}
+                          onChange={(e) =>
+                            setFormData((prev) => ({ ...prev, contactEmail: e.target.value }))
+                          }
+                          placeholder="client@example.com"
+                          required={formData.createTrackingAccount}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Client Phone</Label>
+                        <Input
+                          value={formData.contactPhone}
+                          onChange={(e) =>
+                            setFormData((prev) => ({ ...prev, contactPhone: e.target.value }))
+                          }
+                          placeholder="+254..."
+                        />
+                      </div>
+                    </div>
+                    {formData.debtSource === 'contact-us-lead' && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-xl"
+                        onClick={() =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            contactEmail: prev.contactEmail || fawaysContact.email,
+                            contactPhone: prev.contactPhone || fawaysContact.phones[0],
+                          }))
+                        }
+                      >
+                        Use Contact Us defaults
+                      </Button>
+                    )}
+                  </div>
+                )}
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
@@ -359,7 +734,7 @@ export default function NewDebtPage() {
                       Financial exposure & routing
                     </h2>
                     <p className="text-xs text-slate-500">
-                      Confirm amounts, timing and how the case enters your pipeline.
+                      Confirm amounts, due date, and processing status for this case.
                     </p>
                   </div>
                   <Badge variant="secondary" className="rounded-full px-3 py-1 text-[11px]">
@@ -478,6 +853,13 @@ export default function NewDebtPage() {
                     />
                   </div>
                 </div>
+
+                {createdCredentials && (
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                    Tracking account created for {createdCredentials.email}. Temporary password:{' '}
+                    <span className="font-semibold">{createdCredentials.password}</span>
+                  </div>
+                )}
               </div>
             )}
 

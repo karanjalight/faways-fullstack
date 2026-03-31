@@ -22,9 +22,58 @@ function generatePassword(length = 16) {
   return pwd;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const supabaseAdmin = getSupabaseAdmin();
   if (!supabaseAdmin) return notConfigured();
+  const email = req.nextUrl.searchParams.get('email')?.trim().toLowerCase();
+
+  if (email) {
+    const { data, error } = await supabaseAdmin
+      .from('clients')
+      .select(
+        `
+          id,
+          name,
+          email,
+          phone,
+          status,
+          region,
+          total_debt,
+          total_paid,
+          last_contact_at
+        `,
+      )
+      .eq('email', email)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error loading client by email', error);
+      return NextResponse.json(
+        { error: 'Failed to load client by email' },
+        { status: 500 },
+      );
+    }
+
+    if (!data) return NextResponse.json(null);
+
+    const totalDebt = Number(data.total_debt ?? 0);
+    const paidAmount = Number(data.total_paid ?? 0);
+    return NextResponse.json({
+      id: data.id as string,
+      name: data.name as string,
+      email: (data.email as string) ?? '',
+      phone: (data.phone as string) ?? '',
+      company: (data.region as string) ?? '',
+      totalDebt,
+      paidAmount,
+      remainingAmount: totalDebt - paidAmount,
+      status: (data.status as 'active' | 'inactive' | 'closed') ?? 'active',
+      assignedAgent: undefined,
+      lastContact:
+        (data.last_contact_at as string) ?? new Date().toISOString().slice(0, 10),
+      createdAt: new Date().toISOString().slice(0, 10),
+    });
+  }
 
   // Fetch clients with simple aggregates from debts
   const { data, error } = await supabaseAdmin

@@ -17,6 +17,24 @@ export async function fetchClients(): Promise<Client[]> {
   return (await res.json()) as Client[];
 }
 
+export async function fetchClientByEmail(email: string): Promise<Client | null> {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return null;
+
+  const res = await fetch(`/api/clients?email=${encodeURIComponent(normalized)}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to load client by email');
+  }
+
+  return (await res.json()) as Client | null;
+}
+
 export interface CreateClientPayload {
   clientName: string;
   contactName: string;

@@ -3,7 +3,8 @@
 
 import { useState, useEffect } from 'react';
 import { Client } from '../types/client';
-import { mockAgents } from '../data/mockAgents';
+import { fetchAgents } from '../../lib/agents';
+import type { Agent } from '../types/agent';
 
 interface ClientModalProps {
   isOpen: boolean;
@@ -18,6 +19,8 @@ export default function ClientModal({
   onSave,
   editingClient,
 }: ClientModalProps) {
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [isLoadingAgents, setIsLoadingAgents] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -54,6 +57,23 @@ export default function ClientModal({
       });
     }
   }, [editingClient, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const loadAgents = async () => {
+      setIsLoadingAgents(true);
+      try {
+        const data = await fetchAgents();
+        setAgents(data.filter((agent) => agent.status === 'active'));
+      } catch (error) {
+        console.error(error);
+        setAgents([]);
+      } finally {
+        setIsLoadingAgents(false);
+      }
+    };
+    loadAgents();
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -216,10 +236,13 @@ export default function ClientModal({
                 onChange={(e) =>
                   setFormData({ ...formData, assignedAgent: e.target.value })
                 }
+                disabled={isLoadingAgents}
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
               >
-                <option value="">Unassigned</option>
-                {mockAgents.map((agent) => (
+                <option value="">
+                  {isLoadingAgents ? 'Loading agents...' : 'Unassigned'}
+                </option>
+                {agents.map((agent) => (
                   <option key={agent.id} value={agent.name}>
                     {agent.name}
                   </option>
