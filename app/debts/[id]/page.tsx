@@ -6,6 +6,8 @@ import DashboardLayout from '../../components/DashboardLayout';
 import { Debt, DebtStatus } from '../../types/debt';
 import { getCurrentUser } from '../../lib/auth';
 import { fetchDebtById, updateDebt, deleteDebt } from '../../lib/debts';
+import { fetchAgents } from '../../../lib/agents';
+import type { Agent } from '../../types/agent';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -21,6 +23,7 @@ export default function DebtDetailPage({ params }: DebtDetailPageProps) {
   const [debt, setDebt] = useState<Debt | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [agents, setAgents] = useState<Agent[]>([]);
 
   useEffect(() => {
     const load = async () => {
@@ -36,6 +39,19 @@ export default function DebtDetailPage({ params }: DebtDetailPageProps) {
     load();
   }, [params.id, router]);
 
+  useEffect(() => {
+    const loadAgents = async () => {
+      try {
+        const data = await fetchAgents();
+        setAgents(data.filter((agent) => agent.status === 'active'));
+      } catch (error) {
+        console.error(error);
+        setAgents([]);
+      }
+    };
+    loadAgents();
+  }, []);
+
   const handleFieldChange = <K extends keyof Debt>(key: K, value: Debt[K]) => {
     if (!debt) return;
     setDebt({ ...debt, [key]: value });
@@ -50,6 +66,7 @@ export default function DebtDetailPage({ params }: DebtDetailPageProps) {
         patientName: debt.patientName,
         serviceLine: debt.serviceLine,
         owner: debt.owner,
+        assignedAgentId: debt.assignedAgentId,
         amount: debt.amount,
         paidAmount: debt.paidAmount,
         dueDate: debt.dueDate,
@@ -150,12 +167,22 @@ export default function DebtDetailPage({ params }: DebtDetailPageProps) {
                   </div>
                   <div className="space-y-2">
                     <Label>Collection Owner</Label>
-                    <Input
-                      value={debt.owner}
-                      onChange={(e) =>
-                        handleFieldChange('owner', e.target.value)
-                      }
-                    />
+                    <select
+                      value={debt.assignedAgentId ?? ''}
+                      onChange={(e) => {
+                        const selected = agents.find((agent) => agent.id === e.target.value);
+                        handleFieldChange('assignedAgentId', selected?.id);
+                        handleFieldChange('owner', selected?.name ?? '');
+                      }}
+                      className="h-11 w-full rounded-2xl border border-slate-200 px-4 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Select collection owner</option>
+                      {agents.map((agent) => (
+                        <option key={agent.id} value={agent.id}>
+                          {agent.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </section>

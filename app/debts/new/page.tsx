@@ -8,6 +8,9 @@ import { Client } from '../../types/client';
 import { getCurrentUser } from '../../lib/auth';
 import { createDebt } from '../../lib/debts';
 import { createClientApi, fetchClientByEmail, fetchClients } from '../../lib/clients';
+import { fetchAgents } from '../../../lib/agents';
+import type { Agent } from '../../types/agent';
+import { KENYAN_INSURERS } from '../../constants/kenyanInsurers';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -36,8 +39,6 @@ const serviceLines = [
   'Pediatrics',
   'Newspaper Lead',
 ];
-
-const owners = ['Nia Patel', 'Marcus Ochieng', 'Faith Kim', 'Grace Ahmed'];
 
 const clientTypes: { label: string; value: Debt['clientType'] }[] = [
   { label: 'Business', value: 'hospital' },
@@ -86,6 +87,8 @@ export default function NewDebtPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [clientOptions, setClientOptions] = useState<Client[]>([]);
   const [isLoadingClients, setIsLoadingClients] = useState(false);
+  const [agentOptions, setAgentOptions] = useState<Agent[]>([]);
+  const [isLoadingAgents, setIsLoadingAgents] = useState(false);
   const [formData, setFormData] = useState<FormState>({
     debtSource: 'hospital-intake',
     debtorKind: 'patient',
@@ -99,7 +102,7 @@ export default function NewDebtPage() {
     contactEmail: '',
     contactPhone: '',
     createTrackingAccount: false,
-    owner: owners[0],
+    owner: '',
     stage: 'new',
     amount: '',
     paidAmount: '',
@@ -126,6 +129,28 @@ export default function NewDebtPage() {
     loadClients();
   }, []);
 
+  useEffect(() => {
+    const loadAgents = async () => {
+      setIsLoadingAgents(true);
+      try {
+        const agents = await fetchAgents();
+        const activeAgents = agents.filter((agent) => agent.status === 'active');
+        setAgentOptions(activeAgents);
+        setFormData((prev) => ({
+          ...prev,
+          owner: prev.owner || activeAgents[0]?.name || '',
+        }));
+      } catch (error) {
+        console.error(error);
+        setAgentOptions([]);
+      } finally {
+        setIsLoadingAgents(false);
+      }
+    };
+
+    loadAgents();
+  }, []);
+
   const goNext = () => {
     if (step === 1) {
       const isNewspaperLead = formData.debtSource === 'newspaper-lead';
@@ -137,6 +162,10 @@ export default function NewDebtPage() {
       }
       if (!formData.serviceLine) {
         alert('Please specify the service line.');
+        return;
+      }
+      if (!formData.owner) {
+        alert('Please assign a collection owner.');
         return;
       }
       if (requiresPatientFields && (!formData.patientName || !formData.patientId)) {
@@ -251,8 +280,11 @@ export default function NewDebtPage() {
         .filter(Boolean)
         .join('\n');
 
+      const selectedAgent = agentOptions.find((agent) => agent.name === formData.owner);
+
       await createDebt({
         clientId: linkedClientId,
+        assignedAgentId: selectedAgent?.id,
         creditor: formData.creditor,
         clientType: formData.clientType,
         patientName: formData.patientName.trim() || formData.creditor,
@@ -546,11 +578,9 @@ export default function NewDebtPage() {
                   </div>
                   <div className="space-y-2">
                     <Label>
-                      {formData.debtorKind === 'patient'
-                        ? 'Patient ID / MRN'
-                        : 'Reference ID'}
-                      {formData.debtorKind === 'patient' &&
-                        formData.debtSource !== 'newspaper-lead' && (
+                      Patient ID / MRN
+                      {(formData.debtorKind === 'patient' ||
+                        formData.debtSource !== 'newspaper-lead') && (
                         <span className="text-rose-500"> *</span>
                       )}
                     </Label>
@@ -565,7 +595,7 @@ export default function NewDebtPage() {
                           : 'e.g. INVOICE-208'
                       }
                       required={
-                        formData.debtorKind === 'patient' &&
+                        formData.debtorKind === 'patient' ||
                         formData.debtSource !== 'newspaper-lead'
                       }
                     />
@@ -590,27 +620,32 @@ export default function NewDebtPage() {
                   </div>
                   <div className="space-y-2">
                     <Label>
-                      Payer / Insurance
+                      Insurance
                       {formData.debtorKind === 'patient' &&
                         formData.debtSource !== 'newspaper-lead' && (
                         <span className="text-rose-500"> *</span>
                       )}
                     </Label>
-                    <Input
+                    <select
                       value={formData.payer}
                       onChange={(e) =>
                         setFormData((prev) => ({ ...prev, payer: e.target.value }))
                       }
-                      placeholder={
-                        formData.debtorKind === 'patient'
-                          ? 'e.g. BlueCross PPO or self-reported'
-                          : 'e.g. Corporate account / direct debtor'
-                      }
+                      className="h-11 w-full rounded-2xl border border-slate-200 px-4 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       required={
                         formData.debtorKind === 'patient' &&
                         formData.debtSource !== 'newspaper-lead'
                       }
-                    />
+                    >
+                      <option value="">Select insurance provider</option>
+                      {KENYAN_INSURERS.map((insurer) => (
+                        <option key={insurer} value={insurer}>
+                          {insurer}
+                        </option>
+                      ))}
+                      <option value="Self Pay">Self Pay</option>
+                      <option value="Other">Other</option>
+                    </select>
                   </div>
                 </div>
 
@@ -703,11 +738,15 @@ export default function NewDebtPage() {
                       onChange={(e) =>
                         setFormData((prev) => ({ ...prev, owner: e.target.value }))
                       }
+                      disabled={isLoadingAgents}
                       className="h-11 w-full rounded-2xl border border-slate-200 px-4 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      {owners.map((owner) => (
-                        <option key={owner} value={owner}>
-                          {owner}
+                      <option value="">
+                        {isLoadingAgents ? 'Loading agents...' : 'Select collection owner'}
+                      </option>
+                      {agentOptions.map((agent) => (
+                        <option key={agent.id} value={agent.name}>
+                          {agent.name}
                         </option>
                       ))}
                     </select>

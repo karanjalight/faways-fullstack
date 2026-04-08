@@ -9,8 +9,10 @@ import {
   updateProfileSettings,
   changePassword,
   loadLoginActivity,
+  loadPlatformActivityLogs,
   type ProfileSettings,
   type LoginActivity,
+  type PlatformActivityLog,
 } from '../lib/settings';
 
 type TabKey = 'profile' | 'security' | 'activity';
@@ -25,6 +27,7 @@ export default function SettingsPage() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loginActivity, setLoginActivity] = useState<LoginActivity[]>([]);
+  const [platformActivity, setPlatformActivity] = useState<PlatformActivityLog[]>([]);
   const [activityLoading, setActivityLoading] = useState(false);
   const [profileLoading, setProfileLoading] = useState(true);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -47,8 +50,11 @@ export default function SettingsPage() {
   useEffect(() => {
     if (activeTab !== 'activity') return;
     setActivityLoading(true);
-    loadLoginActivity()
-      .then(setLoginActivity)
+    Promise.all([loadLoginActivity(), loadPlatformActivityLogs()])
+      .then(([myLogins, platformLogs]) => {
+        setLoginActivity(myLogins);
+        setPlatformActivity(platformLogs);
+      })
       .finally(() => setActivityLoading(false));
   }, [activeTab]);
 
@@ -309,9 +315,12 @@ export default function SettingsPage() {
                     type="button"
                     onClick={() => {
                       setActivityLoading(true);
-                      loadLoginActivity()
-                        .then(setLoginActivity)
-                        .finally(() => setActivityLoading(false));
+                    Promise.all([loadLoginActivity(), loadPlatformActivityLogs()])
+                      .then(([myLogins, platformLogs]) => {
+                        setLoginActivity(myLogins);
+                        setPlatformActivity(platformLogs);
+                      })
+                      .finally(() => setActivityLoading(false));
                     }}
                     className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
                   >
@@ -347,6 +356,55 @@ export default function SettingsPage() {
                       ))}
                     </ul>
                   )}
+                </div>
+                <div className="mt-6 border-t border-slate-100 pt-4">
+                  <h3 className="text-base font-semibold text-slate-900">
+                    Platform activity logs
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-600">
+                    User activity across the platform, including login and action events.
+                  </p>
+                  <div className="mt-3 overflow-hidden rounded-xl border border-slate-200">
+                    {activityLoading ? (
+                      <p className="p-3 text-xs text-slate-500">Loading logs…</p>
+                    ) : platformActivity.length === 0 ? (
+                      <div className="p-3 text-xs text-slate-500">
+                        <p>No platform activity logs found.</p>
+                        <p className="mt-1">
+                          This usually means no audit/event rows exist yet, or your role does not
+                          have permission to read them.
+                        </p>
+                      </div>
+                    ) : (
+                      <table className="min-w-full text-xs">
+                        <thead className="bg-slate-50 text-slate-600">
+                          <tr>
+                            <th className="px-3 py-2 text-left font-semibold">User</th>
+                            <th className="px-3 py-2 text-left font-semibold">Action</th>
+                            <th className="px-3 py-2 text-left font-semibold">Area</th>
+                            <th className="px-3 py-2 text-left font-semibold">IP / Device</th>
+                            <th className="px-3 py-2 text-left font-semibold">Time</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {platformActivity.map((entry) => (
+                            <tr key={entry.id}>
+                              <td className="px-3 py-2 text-slate-800">{entry.actorName}</td>
+                              <td className="px-3 py-2 text-slate-700">{entry.action}</td>
+                              <td className="px-3 py-2 text-slate-700">{entry.tableName}</td>
+                              <td className="px-3 py-2 text-slate-500">
+                                {(entry.ipAddress || 'Unknown IP') + ' / '}
+                                {entry.userAgent || 'Unknown device'}
+                              </td>
+                              <td className="px-3 py-2 text-slate-500">
+                                {new Date(entry.createdAt).toLocaleString()}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
                 </div>
               </div>
             )}

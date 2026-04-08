@@ -7,6 +7,7 @@ import type { Debt, DebtStatus, CollectionStage } from '../types/debt';
 type DebtRow = {
   id: string;
   client_id: string | null;
+  assigned_agent_id: string | null;
   creditor_name: string | null;
   debtor_name: string | null;
   service_line: string | null;
@@ -19,6 +20,49 @@ type DebtRow = {
   priority: 'low' | 'medium' | 'high' | null;
   opened_at: string | null;
   description: string | null;
+};
+
+const PATIENT_ID_TAG = 'Patient ID:';
+const INSURANCE_TAG = 'Insurance:';
+
+const extractTaggedValue = (
+  text: string | null | undefined,
+  tag: string,
+): string => {
+  if (!text) return '';
+  const line = text
+    .split('\n')
+    .find((entry) => entry.trim().toLowerCase().startsWith(tag.toLowerCase()));
+  if (!line) return '';
+  return line.slice(line.indexOf(':') + 1).trim();
+};
+
+const removeTaggedLines = (text: string | null | undefined): string | undefined => {
+  if (!text) return undefined;
+  const cleaned = text
+    .split('\n')
+    .filter((line) => {
+      const normalized = line.trim().toLowerCase();
+      return (
+        !normalized.startsWith(PATIENT_ID_TAG.toLowerCase()) &&
+        !normalized.startsWith(INSURANCE_TAG.toLowerCase())
+      );
+    })
+    .join('\n')
+    .trim();
+  return cleaned || undefined;
+};
+
+const addTaggedMetadata = (description: string | undefined, debt: Debt): string | null => {
+  const lines = [description?.trim() ?? ''].filter(Boolean);
+  if (debt.patientId.trim()) {
+    lines.push(`${PATIENT_ID_TAG} ${debt.patientId.trim()}`);
+  }
+  if (debt.payer.trim()) {
+    lines.push(`${INSURANCE_TAG} ${debt.payer.trim()}`);
+  }
+  const merged = lines.join('\n').trim();
+  return merged || null;
 };
 
 const mapStatusFromDb = (status: DebtRow['status']): DebtStatus => {
@@ -88,19 +132,20 @@ const mapRowToDebt = (row: DebtRow): Debt => {
   return {
     id: row.id,
     clientId: row.client_id ?? undefined,
+    assignedAgentId: row.assigned_agent_id ?? undefined,
     creditor: row.creditor_name ?? '',
     clientType: 'hospital',
     patientName: row.debtor_name ?? '',
-    patientId: '',
+    patientId: extractTaggedValue(row.description, PATIENT_ID_TAG),
     serviceLine: row.service_line ?? '',
-    payer: '',
+    payer: extractTaggedValue(row.description, INSURANCE_TAG),
     owner: row.owner ?? '',
     stage: mapStageFromDb(row.stage),
     amount: row.amount,
     paidAmount: row.paid_amount,
     dueDate: row.due_date ?? new Date().toISOString().slice(0, 10),
     status: mapStatusFromDb(row.status),
-    description: row.description ?? undefined,
+    description: removeTaggedLines(row.description),
     documents: [],
     serviceDate: openedAt.slice(0, 10),
     createdAt: openedAt,
@@ -110,6 +155,7 @@ const mapRowToDebt = (row: DebtRow): Debt => {
 
 const mapDebtToDb = (debt: Debt) => ({
   client_id: debt.clientId ?? null,
+  assigned_agent_id: debt.assignedAgentId ?? null,
   creditor_name: debt.creditor,
   debtor_name: debt.patientName,
   service_line: debt.serviceLine,
@@ -121,7 +167,7 @@ const mapDebtToDb = (debt: Debt) => ({
   status: mapStatusToDb(debt.status),
   priority: debt.priority,
   opened_at: debt.createdAt,
-  description: debt.description ?? null,
+  description: addTaggedMetadata(debt.description, debt),
 });
 
 export async function fetchDebts(): Promise<Debt[]> {
@@ -133,7 +179,7 @@ export async function fetchDebts(): Promise<Debt[]> {
   let query = supabase
     .from('debts')
     .select(
-      'id, client_id, creditor_name, debtor_name, service_line, owner, stage, amount, paid_amount, due_date, status, priority, opened_at, description',
+      'id, client_id, assigned_agent_id, creditor_name, debtor_name, service_line, owner, stage, amount, paid_amount, due_date, status, priority, opened_at, description',
     )
     .order('due_date', { ascending: true });
 
@@ -166,7 +212,7 @@ export async function fetchDebtById(id: string): Promise<Debt | null> {
   const { data, error } = await supabase
     .from('debts')
     .select(
-      'id, client_id, creditor_name, debtor_name, service_line, owner, stage, amount, paid_amount, due_date, status, priority, opened_at, description',
+      'id, client_id, assigned_agent_id, creditor_name, debtor_name, service_line, owner, stage, amount, paid_amount, due_date, status, priority, opened_at, description',
     )
     .eq('id', id)
     .maybeSingle();
@@ -194,7 +240,7 @@ export async function createDebt(
     .from('debts')
     .insert(toInsert)
     .select(
-      'id, creditor_name, debtor_name, service_line, owner, stage, amount, paid_amount, due_date, status, priority, opened_at, description',
+      'id, client_id, assigned_agent_id, creditor_name, debtor_name, service_line, owner, stage, amount, paid_amount, due_date, status, priority, opened_at, description',
     )
     .single();
 
@@ -216,6 +262,8 @@ export async function updateDebt(
   if (fields.patientName !== undefined) partialDb.debtor_name = fields.patientName;
   if (fields.serviceLine !== undefined) partialDb.service_line = fields.serviceLine;
   if (fields.owner !== undefined) partialDb.owner = fields.owner;
+  if (fields.assignedAgentId !== undefined)
+    partialDb.assigned_agent_id = fields.assignedAgentId;
   if (fields.stage !== undefined) partialDb.stage = mapStageToDb(fields.stage);
   if (fields.amount !== undefined) partialDb.amount = fields.amount;
   if (fields.paidAmount !== undefined) partialDb.paid_amount = fields.paidAmount;
@@ -224,6 +272,47 @@ export async function updateDebt(
   if (fields.priority !== undefined) partialDb.priority = fields.priority;
   if (fields.description !== undefined)
     partialDb.description = fields.description ?? null;
+  if (fields.patientId !== undefined || fields.payer !== undefined) {
+    const { data: existing } = await supabase
+      .from('debts')
+      .select('description')
+      .eq('id', id)
+      .maybeSingle();
+
+    const currentDescription = (existing as Pick<DebtRow, 'description'> | null)?.description;
+    const currentDebtLike = {
+      patientId:
+        fields.patientId ??
+        extractTaggedValue(currentDescription, PATIENT_ID_TAG),
+      payer:
+        fields.payer ?? extractTaggedValue(currentDescription, INSURANCE_TAG),
+      description:
+        fields.description !== undefined
+          ? fields.description
+          : removeTaggedLines(currentDescription),
+    } as Pick<Debt, 'patientId' | 'payer' | 'description'>;
+
+    partialDb.description = addTaggedMetadata(currentDebtLike.description, {
+      ...(fields as Debt),
+      id,
+      clientType: 'hospital',
+      creditor: '',
+      patientName: '',
+      serviceLine: '',
+      owner: '',
+      stage: 'new',
+      amount: 0,
+      paidAmount: 0,
+      dueDate: new Date().toISOString().slice(0, 10),
+      status: 'pending',
+      documents: [],
+      createdAt: new Date().toISOString(),
+      priority: 'medium',
+      patientId: currentDebtLike.patientId,
+      payer: currentDebtLike.payer,
+      description: currentDebtLike.description,
+    });
+  }
 
   if (Object.keys(partialDb).length === 0) return;
 

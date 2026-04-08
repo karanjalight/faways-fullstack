@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import DashboardLayout from "../../components/DashboardLayout";
 import type { Client } from "../../types/client";
+import type { Debt } from "../../types/debt";
 import { Button } from "@/components/ui/button";
+import { fetchDebts } from "../../lib/debts";
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-US", {
@@ -27,6 +29,7 @@ export default function ClientDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const [client, setClient] = useState<Client | null>(null);
+  const [clientDebts, setClientDebts] = useState<Debt[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,7 +48,17 @@ export default function ClientDetailPage() {
         if (!found) {
           throw new Error("Client not found");
         }
-        setClient(found);
+        const allDebts = await fetchDebts();
+        const relatedDebts = allDebts.filter((debt) => debt.clientId === found.id);
+        const totalDebt = relatedDebts.reduce((sum, debt) => sum + debt.amount, 0);
+        const paidAmount = relatedDebts.reduce((sum, debt) => sum + debt.paidAmount, 0);
+        setClientDebts(relatedDebts);
+        setClient({
+          ...found,
+          totalDebt,
+          paidAmount,
+          remainingAmount: totalDebt - paidAmount,
+        });
       } catch (e) {
         console.error(e);
         setError("Unable to load this client profile.");
@@ -69,6 +82,8 @@ export default function ClientDetailPage() {
     client && client.totalDebt > 0
       ? (client.paidAmount / client.totalDebt) * 100
       : 0;
+  const overdueDebts = clientDebts.filter((debt) => debt.status === "overdue").length;
+  const openDebts = clientDebts.filter((debt) => debt.status !== "paid").length;
 
   return (
     <DashboardLayout>
@@ -147,8 +162,36 @@ export default function ClientDetailPage() {
           <p className="text-sm text-red-600">{error}</p>
         )}
         {client && (
-          <div className="grid gap-6 lg:grid-cols-[3fr,2fr]">
-            <div className="space-y-4 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+          <div className="space-y-6">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+                <p className="text-xs uppercase tracking-wide text-slate-500">Total debt</p>
+                <p className="mt-2 text-2xl font-semibold text-slate-900">
+                  {formatCurrency(client.totalDebt)}
+                </p>
+              </div>
+              <div className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+                <p className="text-xs uppercase tracking-wide text-slate-500">Collected</p>
+                <p className="mt-2 text-2xl font-semibold text-emerald-600">
+                  {formatCurrency(client.paidAmount)}
+                </p>
+              </div>
+              <div className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+                <p className="text-xs uppercase tracking-wide text-slate-500">Outstanding</p>
+                <p className="mt-2 text-2xl font-semibold text-rose-600">
+                  {formatCurrency(client.remainingAmount)}
+                </p>
+              </div>
+              <div className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+                <p className="text-xs uppercase tracking-wide text-slate-500">Open / Overdue</p>
+                <p className="mt-2 text-2xl font-semibold text-slate-900">
+                  {openDebts} / <span className="text-rose-600">{overdueDebts}</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-[3fr,2fr]">
+              <div className="space-y-4 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
               <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
                 Financial exposure
               </h2>
@@ -187,9 +230,9 @@ export default function ClientDetailPage() {
                   />
                 </div>
               </div>
-            </div>
+              </div>
 
-            <div className="space-y-4 rounded-3xl bg-slate-50 p-5 ring-1 ring-slate-100">
+              <div className="space-y-4 rounded-3xl bg-slate-50 p-5 ring-1 ring-slate-100">
               <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
                 Account metadata
               </h2>
@@ -211,6 +254,74 @@ export default function ClientDetailPage() {
                   <p className="text-slate-900">{client.phone}</p>
                 </div>
               </div>
+              </div>
+            </div>
+
+            <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <h2 className="text-base font-semibold text-slate-900">
+                    Related debts
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Every debt currently linked to this client account.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  className="rounded-full"
+                  onClick={() => router.push("/debts/new")}
+                >
+                  + Add Debt
+                </Button>
+              </div>
+              {clientDebts.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                  No debts linked to this client yet.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {clientDebts.map((debt) => (
+                    <button
+                      key={debt.id}
+                      type="button"
+                      onClick={() => router.push(`/debts/${debt.id}`)}
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left transition hover:border-blue-300 hover:bg-blue-50/30"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">
+                            {debt.patientName || debt.creditor}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            {debt.serviceLine} • Due {formatDate(debt.dueDate)}
+                          </p>
+                        </div>
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                            debt.status === "paid"
+                              ? "bg-emerald-100 text-emerald-700"
+                              : debt.status === "overdue"
+                                ? "bg-rose-100 text-rose-700"
+                                : "bg-amber-100 text-amber-700"
+                          }`}
+                        >
+                          {debt.status}
+                        </span>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between text-sm">
+                        <span className="text-slate-500">
+                          Paid {formatCurrency(debt.paidAmount)} /{" "}
+                          {formatCurrency(debt.amount)}
+                        </span>
+                        <span className="font-semibold text-rose-600">
+                          Remaining {formatCurrency(debt.amount - debt.paidAmount)}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

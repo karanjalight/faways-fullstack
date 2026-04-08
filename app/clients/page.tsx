@@ -16,7 +16,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { fetchClients, createClientApi } from "../lib/clients";
+import { fetchDebts } from "../lib/debts";
 import { useRouter } from "next/navigation";
+import type { Debt } from "../types/debt";
 
 export default function ClientsPage() {
   const router = useRouter();
@@ -27,6 +29,7 @@ export default function ClientsPage() {
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [debts, setDebts] = useState<Debt[]>([]);
   const [creationCredentials, setCreationCredentials] = useState<{
     email: string;
     password: string;
@@ -36,6 +39,8 @@ export default function ClientsPage() {
     const load = async () => {
       try {
         const data = await fetchClients();
+        const debtData = await fetchDebts();
+        setDebts(debtData);
         setClients(data);
       } catch (error) {
         console.error(error);
@@ -46,20 +51,52 @@ export default function ClientsPage() {
     load();
   }, []);
 
+  const clientsWithLiveBalances = useMemo(() => {
+    const totalsByClientId = debts.reduce<
+      Record<string, { totalDebt: number; paidAmount: number }>
+    >((acc, debt) => {
+      if (!debt.clientId) return acc;
+      if (!acc[debt.clientId]) {
+        acc[debt.clientId] = { totalDebt: 0, paidAmount: 0 };
+      }
+      acc[debt.clientId].totalDebt += debt.amount;
+      acc[debt.clientId].paidAmount += debt.paidAmount;
+      return acc;
+    }, {});
+
+    return clients.map((client) => {
+      const totals = totalsByClientId[client.id];
+      if (!totals) {
+        return {
+          ...client,
+          totalDebt: 0,
+          paidAmount: 0,
+          remainingAmount: 0,
+        };
+      }
+      return {
+        ...client,
+        totalDebt: totals.totalDebt,
+        paidAmount: totals.paidAmount,
+        remainingAmount: totals.totalDebt - totals.paidAmount,
+      };
+    });
+  }, [clients, debts]);
+
   // Authentication is handled globally in DashboardLayout via Supabase
 
   // Filter clients based on search
   const filteredClients = useMemo(() => {
-    if (!searchQuery) return clients;
+    if (!searchQuery) return clientsWithLiveBalances;
     const query = searchQuery.toLowerCase();
-    return clients.filter(
+    return clientsWithLiveBalances.filter(
       (client) =>
         client.name.toLowerCase().includes(query) ||
         client.email.toLowerCase().includes(query) ||
         client.company?.toLowerCase().includes(query) ||
         client.assignedAgent?.toLowerCase().includes(query)
     );
-  }, [clients, searchQuery]);
+  }, [clientsWithLiveBalances, searchQuery]);
 
   // Format currency
   const formatCurrency = (amount: number) => {
@@ -81,23 +118,23 @@ export default function ClientsPage() {
   };
 
   const metrics = useMemo(() => {
-    const totalClients = clients.length;
-    const totalExposure = clients.reduce(
+    const totalClients = clientsWithLiveBalances.length;
+    const totalExposure = clientsWithLiveBalances.reduce(
       (sum, client) => sum + client.totalDebt,
       0,
     );
-    const collected = clients.reduce(
+    const collected = clientsWithLiveBalances.reduce(
       (sum, client) => sum + client.paidAmount,
       0,
     );
-    const remaining = clients.reduce(
+    const remaining = clientsWithLiveBalances.reduce(
       (sum, client) => sum + client.remainingAmount,
       0,
     );
-    const activeCount = clients.filter(
+    const activeCount = clientsWithLiveBalances.filter(
       (client) => client.status === "active",
     ).length;
-    const inactiveCount = clients.filter(
+    const inactiveCount = clientsWithLiveBalances.filter(
       (client) => client.status === "inactive",
     ).length;
 
@@ -109,7 +146,7 @@ export default function ClientsPage() {
       activeCount,
       inactiveCount,
     };
-  }, [clients]);
+  }, [clientsWithLiveBalances]);
 
   // Status badge
   const StatusBadge = ({ status }: { status: Client["status"] }) => {

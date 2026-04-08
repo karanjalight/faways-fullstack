@@ -17,6 +17,7 @@ export type DebtDocument = {
 export interface Debt {
   id: string;
   clientId?: string; // linked client (Supabase clients.id)
+  assignedAgentId?: string; // linked collection owner (Supabase agents.id)
   creditor: string; // Hospital, clinic or doctor group
   clientType: 'hospital' | 'clinic' | 'practice';
   patientName: string;

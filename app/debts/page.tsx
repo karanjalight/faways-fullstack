@@ -15,14 +15,16 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function DebtsPage() {
   const router = useRouter();
   const [debts, setDebts] = useState<Debt[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [user] = useState<{ name: string } | null>(null);
+  const [activeFilter, setActiveFilter] = useState<
+    'all' | 'open' | 'overdue' | 'high' | 'paid'
+  >('all');
 
   useEffect(() => {
     const loadDebts = async () => {
@@ -39,11 +41,19 @@ export default function DebtsPage() {
     loadDebts();
   }, []);
 
+  const filteredDebts = useMemo(() => {
+    if (activeFilter === 'all') return debts;
+    if (activeFilter === 'overdue') return debts.filter((debt) => debt.status === 'overdue');
+    if (activeFilter === 'high') return debts.filter((debt) => debt.priority === 'high');
+    if (activeFilter === 'paid') return debts.filter((debt) => debt.status === 'paid');
+    return debts.filter((debt) => debt.status !== 'paid');
+  }, [debts, activeFilter]);
+
   const metrics = useMemo(() => {
-    const total = debts.reduce((sum, debt) => sum + debt.amount, 0);
-    const collected = debts.reduce((sum, debt) => sum + debt.paidAmount, 0);
-    const overdue = debts.filter((debt) => debt.status === 'overdue');
-    const highPriority = debts.filter((debt) => debt.priority === 'high');
+    const total = filteredDebts.reduce((sum, debt) => sum + debt.amount, 0);
+    const collected = filteredDebts.reduce((sum, debt) => sum + debt.paidAmount, 0);
+    const overdue = filteredDebts.filter((debt) => debt.status === 'overdue');
+    const highPriority = filteredDebts.filter((debt) => debt.priority === 'high');
     return {
       total,
       collected,
@@ -51,7 +61,45 @@ export default function DebtsPage() {
       overdueCount: overdue.length,
       highPriority: highPriority.length,
     };
-  }, [debts]);
+  }, [filteredDebts]);
+
+  const exportDebts = () => {
+    if (filteredDebts.length === 0) {
+      alert('No debts to export for this filter.');
+      return;
+    }
+    const rows = filteredDebts.map((debt) => ({
+      id: debt.id,
+      client: debt.creditor,
+      debtor: debt.patientName,
+      serviceLine: debt.serviceLine,
+      owner: debt.owner,
+      status: debt.status,
+      priority: debt.priority,
+      amount: debt.amount,
+      paidAmount: debt.paidAmount,
+      remaining: debt.amount - debt.paidAmount,
+      dueDate: debt.dueDate,
+    }));
+    const header = Object.keys(rows[0]).join(',');
+    const body = rows
+      .map((row) =>
+        Object.values(row)
+          .map((value) => `"${String(value).replace(/"/g, '""')}"`)
+          .join(','),
+      )
+      .join('\n');
+    const csv = `${header}\n${body}`;
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `debts-${activeFilter}-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   const documentQueue = useMemo(() => {
     return debts
@@ -124,11 +172,13 @@ export default function DebtsPage() {
               Debts & Care Collections
             </h1>
             <p className="text-sm text-slate-500">
-              {debts.length} active hospital & doctor cases curated for {user?.name ?? 'you'}.
+              {filteredDebts.length} cases under the current filter for {user?.name ?? 'you'}.
             </p>
           </div>
           <div className="flex gap-3">
-            
+            <Button variant="outline" className="rounded-2xl" onClick={exportDebts}>
+              Export
+            </Button>
             <Button
               className="rounded-2xl bg-blue-800 px-6"
               onClick={() => {
@@ -179,6 +229,16 @@ export default function DebtsPage() {
           </Card>
         </div>
 
+        <Tabs value={activeFilter} onValueChange={(value) => setActiveFilter(value as typeof activeFilter)}>
+          <TabsList className="grid w-full max-w-2xl grid-cols-5 rounded-2xl">
+            <TabsTrigger value="all">All</TabsTrigger>
+            <TabsTrigger value="open">Open</TabsTrigger>
+            <TabsTrigger value="overdue">Overdue</TabsTrigger>
+            <TabsTrigger value="high">High Priority</TabsTrigger>
+            <TabsTrigger value="paid">Paid</TabsTrigger>
+          </TabsList>
+        </Tabs>
+
         <div className="grid gap-6 lg:grid-cols-[2fr,1fr]">
           <Card className="rounded-3xl border-none bg-white shadow-lg shadow-slate-100/70">
             
@@ -187,7 +247,7 @@ export default function DebtsPage() {
                 <p className="text-sm text-slate-500">Loading debts...</p>
               ) : (
                 <DebtList
-                  debts={debts}
+                  debts={filteredDebts}
                   onEdit={(debt) => router.push(`/debts/${debt.id}`)}
                   onStatusChange={handleStatusChange}
                   onDelete={handleDeleteDebt}

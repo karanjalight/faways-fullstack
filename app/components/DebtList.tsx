@@ -25,10 +25,12 @@ export default function DebtList({
   const [sortBy, setSortBy] = useState<"date" | "amount" | "priority">("date");
   const [searchQuery, setSearchQuery] = useState("");
   const [serviceLine, setServiceLine] = useState<"all" | string>("all");
+  const [clientFilter, setClientFilter] = useState<"all" | string>("all");
 
   const uniqueServiceLines = Array.from(
     new Set(debts.map((debt) => debt.serviceLine)),
   );
+  const uniqueClients = Array.from(new Set(debts.map((debt) => debt.creditor)));
 
   const filteredDebts = debts
     .filter((debt) => {
@@ -36,13 +38,16 @@ export default function DebtList({
       const matchesService =
         serviceLine === "all" ||
         debt.serviceLine.toLowerCase() === serviceLine.toLowerCase();
+      const matchesClient =
+        clientFilter === "all" ||
+        debt.creditor.toLowerCase() === clientFilter.toLowerCase();
       const matchesSearch =
         searchQuery === "" ||
         debt.creditor.toLowerCase().includes(searchQuery.toLowerCase()) ||
         debt.patientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         debt.patientId.toLowerCase().includes(searchQuery.toLowerCase()) ||
         debt.payer.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesStatus && matchesService && matchesSearch;
+      return matchesStatus && matchesService && matchesClient && matchesSearch;
     })
     .sort((a, b) => {
       switch (sortBy) {
@@ -54,7 +59,7 @@ export default function DebtList({
         }
         case "date":
         default:
-          return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       }
     });
 
@@ -71,6 +76,15 @@ export default function DebtList({
       month: "short",
       day: "numeric",
       year: "numeric",
+    });
+
+  const formatDateTime = (dateString: string) =>
+    new Date(dateString).toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
 
   const handleRowClick = (debtId: string) => {
@@ -99,7 +113,7 @@ export default function DebtList({
         </div>
 
         <div className="flex gap-4">
-          <div className="grid flex-1 grid-cols-2 gap-3 lg:flex lg:flex-1">
+          <div className="grid flex-1 grid-cols-3 gap-3 lg:flex lg:flex-1">
             <select
               value={filter}
               onChange={(e) => setFilter(e.target.value as DebtStatus | "all")}
@@ -123,6 +137,18 @@ export default function DebtList({
                 </option>
               ))}
             </select>
+            <select
+              value={clientFilter}
+              onChange={(e) => setClientFilter(e.target.value)}
+              className="h-12 rounded-2xl border border-slate-500 px-4 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Clients</option>
+              {uniqueClients.map((client) => (
+                <option key={client} value={client}>
+                  {client}
+                </option>
+              ))}
+            </select>
           </div>
           <select
             value={sortBy}
@@ -131,7 +157,7 @@ export default function DebtList({
             }
             className="col-span-2 h-12 rounded-2xl border border-slate-500 px-4 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="date">Sort by Due Date</option>
+            <option value="date">Sort by Date Created</option>
             <option value="amount">Sort by Amount</option>
             <option value="priority">Sort by Priority</option>
           </select>
@@ -143,6 +169,7 @@ export default function DebtList({
               setSortBy("date");
               setSearchQuery("");
               setServiceLine("all");
+              setClientFilter("all");
             }}
           >
             Reset
@@ -162,9 +189,11 @@ export default function DebtList({
                 {/* <th className="px-6 py-4 rounded-tl-3xl">Ref #</th> */}
                 <th className="px-4 py-4">Client / Debtor</th>
                 <th className="px-4 py-4">Service Line</th>
+                <th className="px-4 py-4">Insurance</th>
                 <th className="px-4 py-4">Owner</th>
                 <th className="px-4 py-4">Amount</th>
                 <th className="px-4 py-4">Remaining</th>
+                <th className="px-4 py-4">Created</th>
                 <th className="px-4 py-4">Due Date</th>
                 <th className="px-4 py-4">Status</th>
                 <th className="px-4 py-4 rounded-tr-3xl text-center">Actions</th>
@@ -198,6 +227,9 @@ export default function DebtList({
                       {debt.serviceLine}
                     </td>
                     <td className="px-4 py-4 align-middle text-[13px] text-slate-700">
+                      {debt.payer}
+                    </td>
+                    <td className="px-4 py-4 align-middle text-[13px] text-slate-700">
                       {debt.owner}
                     </td>
                     <td className="px-4 py-4 align-middle text-[13px] text-slate-700">
@@ -205,6 +237,9 @@ export default function DebtList({
                     </td>
                     <td className="px-4 py-4 align-middle text-[13px] text-slate-700">
                       {formatCurrency(remaining)}
+                    </td>
+                    <td className="px-4 py-4 align-middle text-[13px] text-slate-700">
+                      {formatDateTime(debt.createdAt)}
                     </td>
                     <td className="px-4 py-4 align-middle text-[13px] text-slate-700">
                       {formatDate(debt.dueDate)}

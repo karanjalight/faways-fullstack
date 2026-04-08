@@ -16,6 +16,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import type { Debt, DebtDocument, DebtStatus } from '../types/debt';
+import { KENYAN_INSURERS } from '../constants/kenyanInsurers';
+import { fetchAgents } from '../../lib/agents';
+import type { Agent } from '../types/agent';
 
 interface AddDebtModalProps {
   isOpen: boolean;
@@ -25,27 +28,10 @@ interface AddDebtModalProps {
 }
 
 const serviceLines = ['Cardiology', 'Orthopedics', 'Oncology', 'Trauma', 'Radiology', 'Pediatrics'];
-const owners = ['Nia Patel', 'Marcus Ochieng', 'Faith Kim', 'Grace Ahmed'];
 const clientTypes = [
   { label: 'Hospital', value: 'hospital' },
   { label: 'Clinic', value: 'clinic' },
   { label: 'Specialty Practice', value: 'practice' },
-];
-
-const KENYAN_INSURERS = [
-  'Jubilee Health Insurance',
-  'Britam Insurance',
-  'APA Insurance',
-  'UAP Old Mutual',
-  'CIC Insurance',
-  'AAR Insurance',
-  'Madison Insurance',
-  'Resolution Insurance',
-  'Heritage Insurance',
-  'Kenindia Assurance',
-  'GA Insurance',
-  'Sanlam Insurance',
-  'ICEA Lion Group',
 ];
 
 export default function AddDebtModal({
@@ -61,7 +47,7 @@ export default function AddDebtModal({
     patientId: '',
     serviceLine: serviceLines[0],
     payer: '',
-    owner: owners[0],
+    owner: '',
     stage: 'new' as Debt['stage'],
     amount: '',
     paidAmount: '',
@@ -76,6 +62,8 @@ export default function AddDebtModal({
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [lockedClientName, setLockedClientName] = useState<string | null>(null);
   const [insuranceSearch, setInsuranceSearch] = useState('');
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [isLoadingAgents, setIsLoadingAgents] = useState(false);
 
   useEffect(() => {
     if (editingDebt) {
@@ -105,7 +93,7 @@ export default function AddDebtModal({
         patientId: '',
         serviceLine: serviceLines[0],
         payer: '',
-        owner: owners[0],
+        owner: agents[0]?.name ?? '',
         stage: 'new',
         amount: '',
         paidAmount: '',
@@ -117,7 +105,31 @@ export default function AddDebtModal({
       });
       setAttachments([]);
     }
-  }, [editingDebt, isOpen]);
+  }, [editingDebt, isOpen, agents]);
+
+  useEffect(() => {
+    const loadAgents = async () => {
+      setIsLoadingAgents(true);
+      try {
+        const data = await fetchAgents();
+        const activeAgents = data.filter((agent) => agent.status === 'active');
+        setAgents(activeAgents);
+        setFormData((prev) => ({
+          ...prev,
+          owner: prev.owner || activeAgents[0]?.name || '',
+        }));
+      } catch (error) {
+        console.error(error);
+        setAgents([]);
+      } finally {
+        setIsLoadingAgents(false);
+      }
+    };
+
+    if (isOpen) {
+      loadAgents();
+    }
+  }, [isOpen]);
 
   // Load clients and determine if current user is a client (lock client selection)
   useEffect(() => {
@@ -214,8 +226,11 @@ export default function AddDebtModal({
       return;
     }
 
+    const selectedAgent = agents.find((agent) => agent.name === formData.owner);
+
     onSave({
       clientId: selectedClientId,
+      assignedAgentId: selectedAgent?.id,
       creditor: formData.creditor,
       clientType: formData.clientType,
       patientName: formData.patientName,
@@ -461,11 +476,15 @@ export default function AddDebtModal({
               <select
                 value={formData.owner}
                 onChange={(e) => setFormData({ ...formData, owner: e.target.value })}
+                disabled={isLoadingAgents}
                 className="h-11 w-full rounded-2xl border border-slate-200 px-4 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                {owners.map((owner) => (
-                  <option key={owner} value={owner}>
-                    {owner}
+                <option value="">
+                  {isLoadingAgents ? 'Loading agents...' : 'Select collection owner'}
+                </option>
+                {agents.map((agent) => (
+                  <option key={agent.id} value={agent.name}>
+                    {agent.name}
                   </option>
                 ))}
               </select>

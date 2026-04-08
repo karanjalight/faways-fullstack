@@ -6,6 +6,8 @@ import DashboardLayout from '../../../components/DashboardLayout';
 import { Debt, DebtStatus, getRemainingAmount } from '../../../types/debt';
 import { getCurrentUser } from '../../../lib/auth';
 import { fetchDebtById, updateDebt, deleteDebt } from '../../../lib/debts';
+import { fetchAgents } from '../../../../lib/agents';
+import type { Agent } from '../../../types/agent';
 import {
   fetchCollectionsForDebt,
   createCollection,
@@ -38,6 +40,7 @@ export default function DebtDetailPage() {
   );
   const [newCollectionInsurance, setNewCollectionInsurance] = useState('');
   const [newCollectionNotes, setNewCollectionNotes] = useState('');
+  const [agents, setAgents] = useState<Agent[]>([]);
 
   useEffect(() => {
     if (!id) {
@@ -58,6 +61,19 @@ export default function DebtDetailPage() {
 
     load();
   }, [id]);
+
+  useEffect(() => {
+    const loadAgents = async () => {
+      try {
+        const data = await fetchAgents();
+        setAgents(data.filter((agent) => agent.status === 'active'));
+      } catch (error) {
+        console.error(error);
+        setAgents([]);
+      }
+    };
+    loadAgents();
+  }, []);
 
   useEffect(() => {
     if (!id) {
@@ -96,6 +112,7 @@ export default function DebtDetailPage() {
         patientName: debt.patientName,
         serviceLine: debt.serviceLine,
         owner: debt.owner,
+        assignedAgentId: debt.assignedAgentId,
         amount: debt.amount,
         paidAmount: debt.paidAmount,
         dueDate: debt.dueDate,
@@ -317,12 +334,22 @@ export default function DebtDetailPage() {
                       </div>
                       <div className="space-y-2">
                         <Label>Collection Owner</Label>
-                        <Input
-                          value={debt.owner}
-                          onChange={(e) =>
-                            handleFieldChange('owner', e.target.value)
-                          }
-                        />
+                        <select
+                          value={debt.assignedAgentId ?? ''}
+                          onChange={(e) => {
+                            const selected = agents.find((agent) => agent.id === e.target.value);
+                            handleFieldChange('assignedAgentId', selected?.id);
+                            handleFieldChange('owner', selected?.name ?? '');
+                          }}
+                          className="h-11 w-full rounded-2xl border border-slate-200 px-4 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">Select collection owner</option>
+                          {agents.map((agent) => (
+                            <option key={agent.id} value={agent.id}>
+                              {agent.name}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     </div>
 
