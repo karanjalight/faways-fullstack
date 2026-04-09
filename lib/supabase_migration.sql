@@ -128,6 +128,11 @@ create table if not exists public.clients (
   total_debt       numeric(18,2) default 0,
   total_paid       numeric(18,2) default 0,
   last_contact_at  timestamptz,
+  -- Commission on recoveries for all debts under this client (% of each collection or flat per collection)
+  recovery_commission_type    text not null default 'percent'
+    check (recovery_commission_type in ('percent','flat')),
+  recovery_commission_percent numeric(7,4),
+  recovery_commission_flat    numeric(18,2),
   created_at       timestamptz not null default now()
 );
 
@@ -216,6 +221,17 @@ create table if not exists public.debt_collections (
   notes           text,
   created_by      uuid references public.profiles(id),
   created_at      timestamptz not null default now()
+);
+
+-- Remittance / proof files tied to a specific collection event
+create table if not exists public.debt_collection_documents (
+  id                   uuid primary key default gen_random_uuid(),
+  debt_collection_id   uuid not null references public.debt_collections(id) on delete cascade,
+  storage_path         text not null,
+  name                 text not null,
+  mime_type            text,
+  size_bytes           bigint,
+  uploaded_at          timestamptz not null default now()
 );
 
 -- Notes, disputes, threaded comments on each debt
@@ -394,4 +410,136 @@ create table if not exists public.audit_logs (
   user_agent  text,
   created_at  timestamptz not null default now()
 );
+
+-- =========================
+-- STORAGE (debt documents)
+-- =========================
+-- The app uploads to bucket id/name: debt-documents (private).
+-- In Supabase Dashboard: Storage → New bucket → name "debt-documents", disable public access.
+-- Add policies so authenticated users can upload/read under path prefix matching their access model,
+-- for example:
+--   insert into storage.buckets (id, name, public) values ('debt-documents', 'debt-documents', false)
+--   on conflict (id) do nothing;
+-- Then create storage.objects policies for SELECT and INSERT on bucket_id = 'debt-documents'.
+
+-- Commission columns on clients (run on existing databases)
+alter table public.clients
+  add column if not exists recovery_commission_type text default 'percent';
+alter table public.clients
+  add column if not exists recovery_commission_percent numeric(7,4);
+alter table public.clients
+  add column if not exists recovery_commission_flat numeric(18,2);
+
+-- Saved commission invoices (billing batches over debt_collections)
+create table if not exists public.commission_invoices (
+  id                uuid primary key default gen_random_uuid(),
+  reference         text not null unique,
+  client_id         uuid references public.clients(id),
+  period_start      date not null,
+  period_end        date not null,
+  total_recovered   numeric(18,2) not null default 0,
+  total_commission  numeric(18,2) not null default 0,
+  currency          text not null default 'KES',
+  status            text not null default 'issued' check (status in ('issued','paid')),
+  paid_at           timestamptz,
+  paid_note         text,
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now()
+);
+
+create table if not exists public.commission_invoice_lines (
+  id                  uuid primary key default gen_random_uuid(),
+  invoice_id          uuid not null references public.commission_invoices(id) on delete cascade,
+  debt_collection_id  uuid not null references public.debt_collections(id) on delete restrict,
+  amount_recovered    numeric(18,2) not null,
+  commission_amount   numeric(18,2) not null,
+  case_creditor       text,
+  case_debtor         text,
+  collection_date     date,
+  unique (debt_collection_id)
+);
+
+create table if not exists public.commission_invoice_documents (
+  id             uuid primary key default gen_random_uuid(),
+  invoice_id     uuid not null references public.commission_invoices(id) on delete cascade,
+  storage_path   text not null,
+  name           text not null,
+  mime_type      text,
+  size_bytes     bigint,
+  uploaded_at    timestamptz not null default now()
+);
+
+-- Storage bucket: commission-invoice-documents (private), same policy pattern as debt-documents.
+--   - Commission invoice uploads: storage_path like "{invoice_id}/{uuid}-filename"
+--   - Collection history proof: storage_path like "collections/{debt_collection_id}/{uuid}-filename"
+-- Legacy bucket collection-documents may still exist for older paths without the "collections/" prefix.
+
+alter table public.commission_invoice_lines
+  add column if not exists case_creditor text;
+alter table public.commission_invoice_lines
+  add column if not exists case_debtor text;
+alter table public.commission_invoice_lines
+  add column if not exists collection_date date;
+
+-- =========================
+-- RLS: collection proof metadata (required for uploads from the app)
+-- =========================
+-- If you run only this block (not the full file), the table must exist. Requires
+-- public.debt_collections (and public.debts) from earlier in this migration.
+create table if not exists public.debt_collection_documents (
+  id                   uuid primary key default gen_random_uuid(),
+  debt_collection_id   uuid not null references public.debt_collections(id) on delete cascade,
+  storage_path         text not null,
+  name                 text not null,
+  mime_type            text,
+  size_bytes           bigint,
+  uploaded_at          timestamptz not null default now()
+);
+
+-- If this table has RLS enabled without policies, inserts from the dashboard will fail
+-- even when the Storage upload succeeds.
+alter table public.debt_collection_documents enable row level security;
+
+drop policy if exists "debt_collection_documents_authenticated_all" on public.debt_collection_documents;
+create policy "debt_collection_documents_authenticated_all"
+  on public.debt_collection_documents
+  for all
+  to authenticated
+  using (true)
+  with check (true);
+
+-- =========================
+-- Storage RLS: commission-invoice-documents bucket
+-- =========================
+-- Create the bucket in Dashboard (or SQL) first. Names must match the app constant
+-- 'commission-invoice-documents' exactly.
+-- Path layout: "{invoice_id}/…" and "collections/{debt_collection_id}/…"
+insert into storage.buckets (id, name, public)
+values ('commission-invoice-documents', 'commission-invoice-documents', false)
+on conflict (id) do nothing;
+
+drop policy if exists "storage_commission_invoice_select_auth" on storage.objects;
+create policy "storage_commission_invoice_select_auth"
+  on storage.objects for select
+  to authenticated
+  using (bucket_id = 'commission-invoice-documents');
+
+drop policy if exists "storage_commission_invoice_insert_auth" on storage.objects;
+create policy "storage_commission_invoice_insert_auth"
+  on storage.objects for insert
+  to authenticated
+  with check (bucket_id = 'commission-invoice-documents');
+
+drop policy if exists "storage_commission_invoice_update_auth" on storage.objects;
+create policy "storage_commission_invoice_update_auth"
+  on storage.objects for update
+  to authenticated
+  using (bucket_id = 'commission-invoice-documents')
+  with check (bucket_id = 'commission-invoice-documents');
+
+drop policy if exists "storage_commission_invoice_delete_auth" on storage.objects;
+create policy "storage_commission_invoice_delete_auth"
+  on storage.objects for delete
+  to authenticated
+  using (bucket_id = 'commission-invoice-documents');
 

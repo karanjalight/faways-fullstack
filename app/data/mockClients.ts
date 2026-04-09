@@ -15,6 +15,9 @@ export const mockClients: Client[] = [
     assignedAgent: 'John Smith',
     lastContact: '2024-01-15',
     createdAt: '2024-01-10',
+    recoveryCommissionType: 'percent',
+    recoveryCommissionPercent: 12,
+    recoveryCommissionFlat: null,
   },
   {
     id: '2',
@@ -28,6 +31,9 @@ export const mockClients: Client[] = [
     assignedAgent: 'Sarah Johnson',
     lastContact: '2024-01-20',
     createdAt: '2024-01-05',
+    recoveryCommissionType: 'percent',
+    recoveryCommissionPercent: 15,
+    recoveryCommissionFlat: null,
   },
   {
     id: '3',
@@ -42,6 +48,9 @@ export const mockClients: Client[] = [
     assignedAgent: 'Michael Brown',
     lastContact: '2024-01-18',
     createdAt: '2023-12-15',
+    recoveryCommissionType: 'flat',
+    recoveryCommissionPercent: null,
+    recoveryCommissionFlat: 500,
   },
   {
     id: '4',
@@ -55,6 +64,9 @@ export const mockClients: Client[] = [
     assignedAgent: 'David Wilson',
     lastContact: '2024-01-10',
     createdAt: '2023-11-01',
+    recoveryCommissionType: 'percent',
+    recoveryCommissionPercent: 10,
+    recoveryCommissionFlat: null,
   },
   {
     id: '5',
@@ -69,6 +81,9 @@ export const mockClients: Client[] = [
     assignedAgent: 'John Smith',
     lastContact: '2024-01-25',
     createdAt: '2024-01-25',
+    recoveryCommissionType: 'percent',
+    recoveryCommissionPercent: null,
+    recoveryCommissionFlat: null,
   },
   {
     id: '6',
@@ -82,6 +97,9 @@ export const mockClients: Client[] = [
     assignedAgent: 'Michael Brown',
     lastContact: '2024-01-22',
     createdAt: '2024-01-15',
+    recoveryCommissionType: 'percent',
+    recoveryCommissionPercent: 18,
+    recoveryCommissionFlat: null,
   },
 ];
 

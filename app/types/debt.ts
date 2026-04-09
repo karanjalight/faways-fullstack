@@ -7,11 +7,14 @@ export type CollectionStage = 'new' | 'in-review' | 'escalated' | 'legal';
 export type DebtDocument = {
   id: string;
   name: string;
-  type: 'pdf' | 'image';
+  type: 'pdf' | 'image' | 'other';
   size: string;
   uploadedAt: string;
   uploadedBy: string;
+  /** Present when loaded from Supabase Storage */
   url?: string;
+  storagePath?: string;
+  mimeType?: string;
 };
 
 export interface Debt {

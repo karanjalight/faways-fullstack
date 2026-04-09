@@ -1,6 +1,6 @@
 'use client';
 
-import { Client } from '../types/client';
+import type { Client, RecoveryCommissionType } from '../types/client';
 
 export async function fetchClients(): Promise<Client[]> {
   const res = await fetch('/api/clients', {
@@ -41,6 +41,9 @@ export interface CreateClientPayload {
   email: string;
   phone?: string;
   region?: string;
+  recoveryCommissionType?: RecoveryCommissionType;
+  recoveryCommissionPercent?: number | null;
+  recoveryCommissionFlat?: number | null;
 }
 
 export async function createClientApi(payload: CreateClientPayload) {
@@ -61,5 +64,34 @@ export async function createClientApi(payload: CreateClientPayload) {
     client: Client;
     credentials: { email: string; password: string };
   };
+}
+
+export async function updateClientApi(
+  id: string,
+  payload: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    region?: string;
+    status?: Client['status'];
+    recoveryCommissionType?: RecoveryCommissionType;
+    recoveryCommissionPercent?: number | null;
+    recoveryCommissionFlat?: number | null;
+  },
+): Promise<Client> {
+  const res = await fetch(`/api/clients/${id}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.error ?? 'Failed to update client');
+  }
+
+  return (await res.json()) as Client;
 }
 

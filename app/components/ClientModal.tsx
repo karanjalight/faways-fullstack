@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Client } from '../types/client';
+import type { Client, RecoveryCommissionType } from '../types/client';
 import { fetchAgents } from '../../lib/agents';
 import type { Agent } from '../types/agent';
 
@@ -30,6 +30,9 @@ export default function ClientModal({
     paidAmount: '',
     status: 'active' as Client['status'],
     assignedAgent: '',
+    recoveryCommissionType: 'percent' as RecoveryCommissionType,
+    recoveryCommissionPercent: '',
+    recoveryCommissionFlat: '',
   });
 
   useEffect(() => {
@@ -43,6 +46,15 @@ export default function ClientModal({
         paidAmount: editingClient.paidAmount.toString(),
         status: editingClient.status,
         assignedAgent: editingClient.assignedAgent || '',
+        recoveryCommissionType: editingClient.recoveryCommissionType ?? 'percent',
+        recoveryCommissionPercent:
+          editingClient.recoveryCommissionPercent != null
+            ? String(editingClient.recoveryCommissionPercent)
+            : '',
+        recoveryCommissionFlat:
+          editingClient.recoveryCommissionFlat != null
+            ? String(editingClient.recoveryCommissionFlat)
+            : '',
       });
     } else {
       setFormData({
@@ -54,6 +66,9 @@ export default function ClientModal({
         paidAmount: '0',
         status: 'active',
         assignedAgent: '',
+        recoveryCommissionType: 'percent',
+        recoveryCommissionPercent: '',
+        recoveryCommissionFlat: '',
       });
     }
   }, [editingClient, isOpen]);
@@ -79,6 +94,28 @@ export default function ClientModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const pct =
+      formData.recoveryCommissionType === 'percent'
+        ? parseFloat(formData.recoveryCommissionPercent)
+        : NaN;
+    const flat =
+      formData.recoveryCommissionType === 'flat'
+        ? parseFloat(formData.recoveryCommissionFlat)
+        : NaN;
+
+    if (formData.recoveryCommissionType === 'percent' && formData.recoveryCommissionPercent.trim()) {
+      if (Number.isNaN(pct) || pct < 0 || pct > 100) {
+        alert('Commission percent must be between 0 and 100.');
+        return;
+      }
+    }
+    if (formData.recoveryCommissionType === 'flat' && formData.recoveryCommissionFlat.trim()) {
+      if (Number.isNaN(flat) || flat < 0) {
+        alert('Flat commission must be zero or a positive amount.');
+        return;
+      }
+    }
+
     const clientData = {
       name: formData.name,
       email: formData.email,
@@ -91,6 +128,19 @@ export default function ClientModal({
       status: formData.status,
       assignedAgent: formData.assignedAgent || undefined,
       lastContact: new Date().toISOString().split('T')[0],
+      recoveryCommissionType: formData.recoveryCommissionType,
+      recoveryCommissionPercent:
+        formData.recoveryCommissionType === 'percent'
+          ? formData.recoveryCommissionPercent.trim()
+            ? pct
+            : null
+          : null,
+      recoveryCommissionFlat:
+        formData.recoveryCommissionType === 'flat'
+          ? formData.recoveryCommissionFlat.trim()
+            ? flat
+            : null
+          : null,
     };
 
     if (!clientData.name || !clientData.email || !clientData.phone) {
@@ -248,6 +298,70 @@ export default function ClientModal({
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                Recovery commission (all debts for this client)
+              </p>
+              <p className="mb-3 text-xs text-slate-500">
+                Applied to each recorded collection on debts linked to this client. Used on the
+                Invoice page to track your fees.
+              </p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-700">Basis</label>
+                  <select
+                    value={formData.recoveryCommissionType}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        recoveryCommissionType: e.target.value as RecoveryCommissionType,
+                      })
+                    }
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  >
+                    <option value="percent">% of amount recovered</option>
+                    <option value="flat">Flat per collection</option>
+                  </select>
+                </div>
+                {formData.recoveryCommissionType === 'percent' ? (
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-700">
+                      Percent (0–100)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={0.01}
+                      value={formData.recoveryCommissionPercent}
+                      onChange={(e) =>
+                        setFormData({ ...formData, recoveryCommissionPercent: e.target.value })
+                      }
+                      placeholder="e.g. 15"
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-700">
+                      Flat (KES per collection)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={formData.recoveryCommissionFlat}
+                      onChange={(e) =>
+                        setFormData({ ...formData, recoveryCommissionFlat: e.target.value })
+                      }
+                      placeholder="e.g. 2500"
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    />
+                  </div>
+                )}
+              </div>
             </div>
 
             <div>

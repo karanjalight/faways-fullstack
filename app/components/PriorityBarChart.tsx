@@ -16,6 +16,7 @@ import type {
   ValueType,
 } from 'recharts/types/component/DefaultTooltipContent';
 import { Debt } from '../types/debt';
+import { formatKes, kesAxisTick } from '@/lib/format-kes';
 
 interface PriorityBarChartProps {
   debts: Debt[];
@@ -167,9 +168,7 @@ export default function PriorityBarChart({
             yAxisId="right"
             orientation="right"
             tick={{ fontSize: 12 }}
-            tickFormatter={(value: number) =>
-              `$${(value / 1000).toFixed(0)}k`
-            }
+            tickFormatter={(value: number) => kesAxisTick(value)}
           />
 
           <Tooltip content={<PriorityTooltip />} />

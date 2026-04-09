@@ -15,7 +15,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { fetchClients, createClientApi } from "../lib/clients";
+import { fetchClients, createClientApi, updateClientApi } from "../lib/clients";
 import { fetchDebts } from "../lib/debts";
 import { useRouter } from "next/navigation";
 import type { Debt } from "../types/debt";
@@ -209,15 +209,43 @@ export default function ClientsPage() {
   // Handle save
   const handleSave = async (clientData: Omit<Client, 'id' | 'createdAt'>) => {
     if (editingClient) {
-      // Local-only edit for now; can be wired to an API later
-      setClients((prev) =>
-        prev.map((c) =>
-          c.id === editingClient.id
-            ? { ...clientData, id: editingClient.id, createdAt: editingClient.createdAt }
-            : c,
-        ),
-      );
-      setEditingClient(null);
+      try {
+        const updated = await updateClientApi(editingClient.id, {
+          name: clientData.name,
+          email: clientData.email,
+          phone: clientData.phone,
+          region: clientData.company,
+          status: clientData.status,
+          recoveryCommissionType: clientData.recoveryCommissionType,
+          recoveryCommissionPercent: clientData.recoveryCommissionPercent,
+          recoveryCommissionFlat: clientData.recoveryCommissionFlat,
+        });
+        const live = debts
+          .filter((d) => d.clientId === editingClient.id)
+          .reduce(
+            (acc, d) => ({
+              totalDebt: acc.totalDebt + d.amount,
+              paidAmount: acc.paidAmount + d.paidAmount,
+            }),
+            { totalDebt: 0, paidAmount: 0 },
+          );
+        setClients((prev) =>
+          prev.map((c) =>
+            c.id === editingClient.id
+              ? {
+                  ...updated,
+                  totalDebt: live.totalDebt,
+                  paidAmount: live.paidAmount,
+                  remainingAmount: live.totalDebt - live.paidAmount,
+                }
+              : c,
+          ),
+        );
+        setEditingClient(null);
+      } catch (error) {
+        console.error(error);
+        alert((error as Error).message);
+      }
     } else {
       try {
         const { client, credentials } = await createClientApi({
@@ -226,6 +254,9 @@ export default function ClientsPage() {
           email: clientData.email,
           phone: clientData.phone,
           region: clientData.company,
+          recoveryCommissionType: clientData.recoveryCommissionType,
+          recoveryCommissionPercent: clientData.recoveryCommissionPercent,
+          recoveryCommissionFlat: clientData.recoveryCommissionFlat,
         });
         setClients((prev) => [client, ...prev]);
         setCreationCredentials(credentials);

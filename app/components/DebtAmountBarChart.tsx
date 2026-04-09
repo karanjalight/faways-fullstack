@@ -16,6 +16,7 @@ import type {
   ValueType,
 } from 'recharts/types/component/DefaultTooltipContent';
 import { Debt, getRemainingAmount } from '../types/debt';
+import { formatKes, kesAxisTick } from '@/lib/format-kes';
 
 interface DebtAmountBarChartProps {
   debts: Debt[];
@@ -29,13 +30,7 @@ interface DebtChartDatum {
   Remaining: number;
 }
 
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
+const formatCurrency = formatKes;
 
 /**
  * ✅ FIXED TOOLTIP (Type-safe + build-safe)
@@ -151,12 +146,7 @@ export default function DebtAmountBarChart({
             tick={{ fontSize: 12 }}
           />
 
-          <YAxis
-            tickFormatter={(value: number) =>
-              `$${(value / 1000).toFixed(0)}k`
-            }
-            tick={{ fontSize: 12 }}
-          />
+          <YAxis tickFormatter={(value: number) => kesAxisTick(value)} tick={{ fontSize: 12 }} />
 
           <Tooltip content={<DebtAmountTooltip />} />
 

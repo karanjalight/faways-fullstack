@@ -1,6 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
+type RecoveryCommissionType = 'percent' | 'flat';
+
+function mapClientRow(row: Record<string, unknown>) {
+  const totalDebt = Number(row.total_debt ?? 0);
+  const paidAmount = Number(row.total_paid ?? 0);
+  const rawType = row.recovery_commission_type as string | null | undefined;
+  const commissionType: RecoveryCommissionType =
+    rawType === 'flat' ? 'flat' : 'percent';
+
+  return {
+    id: row.id as string,
+    name: row.name as string,
+    email: (row.email as string) ?? '',
+    phone: (row.phone as string) ?? '',
+    company: (row.region as string) ?? '',
+    totalDebt,
+    paidAmount,
+    remainingAmount: totalDebt - paidAmount,
+    status: (row.status as 'active' | 'inactive' | 'closed') ?? 'active',
+    assignedAgent: undefined,
+    lastContact:
+      (row.last_contact_at as string) ?? new Date().toISOString().slice(0, 10),
+    createdAt: row.created_at
+      ? new Date(row.created_at as string).toISOString().slice(0, 10)
+      : new Date().toISOString().slice(0, 10),
+    recoveryCommissionType: commissionType,
+    recoveryCommissionPercent:
+      row.recovery_commission_percent != null
+        ? Number(row.recovery_commission_percent)
+        : null,
+    recoveryCommissionFlat:
+      row.recovery_commission_flat != null
+        ? Number(row.recovery_commission_flat)
+        : null,
+  };
+}
+
 function notConfigured() {
   return NextResponse.json(
     {
@@ -40,7 +77,11 @@ export async function GET(req: NextRequest) {
           region,
           total_debt,
           total_paid,
-          last_contact_at
+          last_contact_at,
+          created_at,
+          recovery_commission_type,
+          recovery_commission_percent,
+          recovery_commission_flat
         `,
       )
       .eq('email', email)
@@ -56,23 +97,7 @@ export async function GET(req: NextRequest) {
 
     if (!data) return NextResponse.json(null);
 
-    const totalDebt = Number(data.total_debt ?? 0);
-    const paidAmount = Number(data.total_paid ?? 0);
-    return NextResponse.json({
-      id: data.id as string,
-      name: data.name as string,
-      email: (data.email as string) ?? '',
-      phone: (data.phone as string) ?? '',
-      company: (data.region as string) ?? '',
-      totalDebt,
-      paidAmount,
-      remainingAmount: totalDebt - paidAmount,
-      status: (data.status as 'active' | 'inactive' | 'closed') ?? 'active',
-      assignedAgent: undefined,
-      lastContact:
-        (data.last_contact_at as string) ?? new Date().toISOString().slice(0, 10),
-      createdAt: new Date().toISOString().slice(0, 10),
-    });
+    return NextResponse.json(mapClientRow(data as Record<string, unknown>));
   }
 
   // Fetch clients with simple aggregates from debts
@@ -88,7 +113,11 @@ export async function GET(req: NextRequest) {
         region,
         total_debt,
         total_paid,
-        last_contact_at
+        last_contact_at,
+        created_at,
+        recovery_commission_type,
+        recovery_commission_percent,
+        recovery_commission_flat
       `,
     )
     .order('created_at', { ascending: false });
@@ -98,27 +127,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to load clients' }, { status: 500 });
   }
 
-  const clients = (data ?? []).map((row) => {
-    const totalDebt = Number(row.total_debt ?? 0);
-    const paidAmount = Number(row.total_paid ?? 0);
-
-    return {
-      id: row.id as string,
-      name: row.name as string,
-      email: (row.email as string) ?? '',
-      phone: (row.phone as string) ?? '',
-      company: (row.region as string) ?? '',
-      totalDebt,
-      paidAmount,
-      remainingAmount: totalDebt - paidAmount,
-      status: (row.status as 'active' | 'inactive' | 'closed') ?? 'active',
-      assignedAgent: undefined,
-      lastContact:
-        (row.last_contact_at as string) ??
-        new Date().toISOString().slice(0, 10),
-      createdAt: new Date().toISOString().slice(0, 10),
-    };
-  });
+  const clients = (data ?? []).map((row) =>
+    mapClientRow(row as Record<string, unknown>),
+  );
 
   return NextResponse.json(clients);
 }
@@ -128,12 +139,24 @@ export async function POST(req: NextRequest) {
   if (!supabaseAdmin) return notConfigured();
 
   const body = await req.json();
-  const { clientName, contactName, email, phone, region } = body as {
+  const {
+    clientName,
+    contactName,
+    email,
+    phone,
+    region,
+    recoveryCommissionType,
+    recoveryCommissionPercent,
+    recoveryCommissionFlat,
+  } = body as {
     clientName: string;
     contactName: string;
     email: string;
     phone?: string;
     region?: string;
+    recoveryCommissionType?: RecoveryCommissionType;
+    recoveryCommissionPercent?: number | null;
+    recoveryCommissionFlat?: number | null;
   };
 
   if (!clientName || !contactName || !email) {
@@ -209,6 +232,9 @@ export async function POST(req: NextRequest) {
   }
 
   // 4) Create client record
+  const commissionType: RecoveryCommissionType =
+    recoveryCommissionType === 'flat' ? 'flat' : 'percent';
+
   const { data: clientRow, error: clientError } = await supabaseAdmin
     .from('clients')
     .insert({
@@ -220,6 +246,15 @@ export async function POST(req: NextRequest) {
       region: region ?? null,
       total_debt: 0,
       total_paid: 0,
+      recovery_commission_type: commissionType,
+      recovery_commission_percent:
+        commissionType === 'percent' && recoveryCommissionPercent != null
+          ? recoveryCommissionPercent
+          : null,
+      recovery_commission_flat:
+        commissionType === 'flat' && recoveryCommissionFlat != null
+          ? recoveryCommissionFlat
+          : null,
     })
     .select(
       `
@@ -231,7 +266,11 @@ export async function POST(req: NextRequest) {
         region,
         total_debt,
         total_paid,
-        last_contact_at
+        last_contact_at,
+        created_at,
+        recovery_commission_type,
+        recovery_commission_percent,
+        recovery_commission_flat
       `,
     )
     .single();
@@ -244,28 +283,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const totalDebt = Number(clientRow.total_debt ?? 0);
-  const paidAmount = Number(clientRow.total_paid ?? 0);
-
   return NextResponse.json(
     {
-      client: {
-        id: clientRow.id as string,
-        name: clientRow.name as string,
-        email: (clientRow.email as string) ?? '',
-        phone: (clientRow.phone as string) ?? '',
-        company: (clientRow.region as string) ?? '',
-        totalDebt,
-        paidAmount,
-        remainingAmount: totalDebt - paidAmount,
-        status:
-          (clientRow.status as 'active' | 'inactive' | 'closed') ?? 'active',
-        assignedAgent: undefined,
-        lastContact:
-          (clientRow.last_contact_at as string) ??
-          new Date().toISOString().slice(0, 10),
-        createdAt: new Date().toISOString().slice(0, 10),
-      },
+      client: mapClientRow(clientRow as Record<string, unknown>),
       credentials: {
         email,
         password,

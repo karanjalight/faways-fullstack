@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 
 interface DebtDetailPageProps {
   params: { id: string };
@@ -286,6 +287,57 @@ export default function DebtDetailPage({ params }: DebtDetailPageProps) {
                     />
                   </div>
                 </div>
+              </section>
+
+              <section className="space-y-4 rounded-3xl bg-white p-6 shadow-sm">
+                <div>
+                  <h2 className="text-base font-semibold text-slate-900">Documents</h2>
+                  <p className="text-xs text-slate-500">
+                    Supporting files linked to this debt. Open may require a fresh page load if the
+                    link expired.
+                  </p>
+                </div>
+                {!debt.documents?.length ? (
+                  <p className="text-sm text-slate-500">No documents on file.</p>
+                ) : (
+                  <ul className="space-y-3">
+                    {debt.documents.map((doc) => (
+                      <li
+                        key={doc.id}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-slate-900">
+                            {doc.name}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            {doc.size} · {new Date(doc.uploadedAt).toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <Badge variant="secondary" className="text-[10px] uppercase">
+                            {doc.type === 'other' ? 'file' : doc.type}
+                          </Badge>
+                          {doc.url ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="rounded-xl text-xs"
+                              asChild
+                            >
+                              <a href={doc.url} target="_blank" rel="noopener noreferrer">
+                                Open
+                              </a>
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-amber-600">Unavailable</span>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </section>
 
               <div className="flex items-center justify-between">

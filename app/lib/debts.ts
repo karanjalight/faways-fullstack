@@ -2,6 +2,7 @@
 
 import { supabase } from '@/lib/supabase-client';
 import type { Debt, DebtStatus, CollectionStage } from '../types/debt';
+import { fetchDebtDocumentsWithUrls } from './debtDocuments';
 
 // Shape of the debts table we care about
 type DebtRow = {
@@ -223,7 +224,13 @@ export async function fetchDebtById(id: string): Promise<Debt | null> {
   }
 
   if (!data) return null;
-  return mapRowToDebt(data as DebtRow);
+  const debt = mapRowToDebt(data as DebtRow);
+  try {
+    const documents = await fetchDebtDocumentsWithUrls(id);
+    return { ...debt, documents };
+  } catch {
+    return debt;
+  }
 }
 
 export async function createDebt(

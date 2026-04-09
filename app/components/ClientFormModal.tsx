@@ -82,6 +82,9 @@ export default function ClientFormModal({
       status: formData.status,
       assignedAgent: formData.assignedAgent || undefined,
       lastContact: formData.lastContact,
+      recoveryCommissionType: 'percent' as const,
+      recoveryCommissionPercent: null as number | null,
+      recoveryCommissionFlat: null as number | null,
     };
 
     if (!clientData.name || !clientData.email || !clientData.phone) {

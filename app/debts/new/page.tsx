@@ -7,6 +7,10 @@ import { Debt, DebtStatus } from '../../types/debt';
 import { Client } from '../../types/client';
 import { getCurrentUser } from '../../lib/auth';
 import { createDebt } from '../../lib/debts';
+import {
+  DEBT_DOCUMENTS_BUCKET,
+  uploadDebtDocumentsForDebt,
+} from '../../lib/debtDocuments';
 import { createClientApi, fetchClientByEmail, fetchClients } from '../../lib/clients';
 import { fetchAgents } from '../../../lib/agents';
 import type { Agent } from '../../types/agent';
@@ -24,6 +28,12 @@ type DebtSource =
   | 'client-referral'
   | 'contact-us-lead';
 type DebtorKind = 'patient' | 'non-patient';
+
+type PendingDebtDocument = {
+  id: string;
+  displayName: string;
+  file: File | null;
+};
 
 const serviceLines = [
   'General Recovery',
@@ -89,6 +99,7 @@ export default function NewDebtPage() {
   const [isLoadingClients, setIsLoadingClients] = useState(false);
   const [agentOptions, setAgentOptions] = useState<Agent[]>([]);
   const [isLoadingAgents, setIsLoadingAgents] = useState(false);
+  const [pendingDocuments, setPendingDocuments] = useState<PendingDebtDocument[]>([]);
   const [formData, setFormData] = useState<FormState>({
     debtSource: 'hospital-intake',
     debtorKind: 'patient',
@@ -282,7 +293,16 @@ export default function NewDebtPage() {
 
       const selectedAgent = agentOptions.find((agent) => agent.name === formData.owner);
 
-      await createDebt({
+      const toUpload = pendingDocuments.filter((d) => d.file);
+      for (const row of pendingDocuments) {
+        if (row.displayName.trim() && !row.file) {
+          alert(`Add a file for the document named "${row.displayName.trim()}" or remove that row.`);
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      const created = await createDebt({
         clientId: linkedClientId,
         assignedAgentId: selectedAgent?.id,
         creditor: formData.creditor,
@@ -308,6 +328,23 @@ export default function NewDebtPage() {
         serviceDate: formData.serviceDate || now.slice(0, 10),
         priority: formData.priority,
       });
+
+      if (toUpload.length > 0) {
+        try {
+          await uploadDebtDocumentsForDebt(
+            created.id,
+            toUpload.map((d) => ({
+              file: d.file as File,
+              displayName: d.displayName.trim() || (d.file as File).name,
+            })),
+          );
+        } catch (uploadErr) {
+          console.error(uploadErr);
+          alert(
+            `The debt was created, but uploading one or more documents failed. You can add files later from the debt detail page once storage is configured (bucket "${DEBT_DOCUMENTS_BUCKET}").`,
+          );
+        }
+      }
 
       router.push('/debts');
     } catch {
@@ -891,6 +928,94 @@ export default function NewDebtPage() {
                       }
                     />
                   </div>
+                </div>
+
+                <div className="space-y-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">Supporting documents</p>
+                      <p className="text-xs text-slate-500">
+                        Optional. Name each file, then choose the file to upload with this debt.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="rounded-xl"
+                      onClick={() =>
+                        setPendingDocuments((prev) => [
+                          ...prev,
+                          { id: crypto.randomUUID(), displayName: '', file: null },
+                        ])
+                      }
+                    >
+                      Add document
+                    </Button>
+                  </div>
+                  {pendingDocuments.length === 0 ? (
+                    <p className="text-xs text-slate-500">
+                      No attachments. Use Add document if you have invoices, letters, or scans.
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {pendingDocuments.map((row) => (
+                        <div
+                          key={row.id}
+                          className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 md:grid-cols-[1fr_1fr_auto]"
+                        >
+                          <div className="space-y-1">
+                            <Label className="text-xs">Document name</Label>
+                            <Input
+                              placeholder="e.g. Invoice, demand letter"
+                              value={row.displayName}
+                              onChange={(e) =>
+                                setPendingDocuments((prev) =>
+                                  prev.map((p) =>
+                                    p.id === row.id ? { ...p, displayName: e.target.value } : p,
+                                  ),
+                                )
+                              }
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">File</Label>
+                            <Input
+                              type="file"
+                              accept=".pdf,image/*,.doc,.docx"
+                              className="cursor-pointer text-sm file:mr-2 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-xs"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0] ?? null;
+                                setPendingDocuments((prev) =>
+                                  prev.map((p) =>
+                                    p.id === row.id ? { ...p, file } : p,
+                                  ),
+                                );
+                              }}
+                            />
+                            {row.file && (
+                              <p className="text-[11px] text-slate-500">{row.file.name}</p>
+                            )}
+                          </div>
+                          <div className="flex items-end justify-end md:justify-start">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-rose-600 hover:text-rose-700"
+                              onClick={() =>
+                                setPendingDocuments((prev) =>
+                                  prev.filter((p) => p.id !== row.id),
+                                )
+                              }
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {createdCredentials && (

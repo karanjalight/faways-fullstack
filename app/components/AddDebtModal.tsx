@@ -180,7 +180,11 @@ export default function AddDebtModal({
           ? `${editingDebt.id}-doc-${attachments.length + index + 1}`
           : `new-doc-${Date.now()}-${index}`,
         name: file.name,
-        type: file.type.includes('pdf') ? 'pdf' : 'image',
+        type: file.type.includes('pdf')
+          ? 'pdf'
+          : file.type.startsWith('image/')
+            ? 'image'
+            : 'other',
         size: kb > 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb} KB`,
         uploadedAt: new Date().toISOString(),
         uploadedBy: formData.owner,
@@ -533,7 +537,7 @@ export default function AddDebtModal({
                       </p>
                     </div>
                     <Badge variant={doc.type === 'pdf' ? 'secondary' : 'default'}>
-                      {doc.type.toUpperCase()}
+                      {doc.type === 'other' ? 'FILE' : doc.type.toUpperCase()}
                     </Badge>
                   </div>
                 ))}
