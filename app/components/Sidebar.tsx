@@ -1,6 +1,7 @@
 // Professional sidebar navigation component
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { logout } from '../lib/auth';
@@ -10,6 +11,10 @@ interface NavItem {
   name: string;
   href: string;
   icon: React.ReactNode;
+  children?: Array<{
+    name: string;
+    href: string;
+  }>;
 }
 
 interface SidebarProps {
@@ -22,6 +27,15 @@ export default function Sidebar({ isOpen, onClose, role }: SidebarProps) {
  
   const pathname = usePathname();
   const router = useRouter();
+  const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({
+    '/invoice': pathname.startsWith('/invoice'),
+  });
+
+  useEffect(() => {
+    if (pathname.startsWith('/invoice')) {
+      setOpenMenus((prev) => ({ ...prev, '/invoice': true }));
+    }
+  }, [pathname]);
 
   // Navigation items configuration
   const navItems: NavItem[] = [
@@ -123,6 +137,12 @@ export default function Sidebar({ isOpen, onClose, role }: SidebarProps) {
     {
       name: 'Invoice',
       href: '/invoice',
+      children: [
+        { name: 'Overview', href: '/invoice' },
+        { name: 'Client billing', href: '/invoice/client-billing' },
+        { name: 'Collections', href: '/invoice/collections' },
+        { name: 'Saved invoices', href: '/invoice/saved' },
+      ],
       icon: (
         <svg
           className="h-5 w-5"
@@ -299,31 +319,105 @@ export default function Sidebar({ isOpen, onClose, role }: SidebarProps) {
           <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
             {filteredNavItems.map((item) => {
               const active = isActive(item.href);
+              const hasChildren = Boolean(item.children?.length);
+              const showChildren = hasChildren && Boolean(openMenus[item.href]);
               return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => {
-                    // Close sidebar on mobile when navigating
-                    if (window.innerWidth < 1024) {
-                      onClose();
-                    }
-                  }}
-                  className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 text-md font-medium transition-colors ${
-                    active
-                      ? 'bg-blue-50 text-blue-700'
-                      : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
-                  }`}
-                >
-                  <span
-                    className={`${
-                      active ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-500'
-                    }`}
-                  >
-                    {item.icon}
-                  </span>
-                  <span>{item.name}</span>
-                </Link>
+                <div key={item.href}>
+                  {hasChildren ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setOpenMenus((prev) => ({
+                          ...prev,
+                          [item.href]: !prev[item.href],
+                        }))
+                      }
+                      aria-expanded={showChildren}
+                      className={`group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-md font-medium transition-colors ${
+                        active
+                          ? 'bg-blue-50 text-blue-700'
+                          : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                      }`}
+                    >
+                      <span
+                        className={`${
+                          active ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-500'
+                        }`}
+                      >
+                        {item.icon}
+                      </span>
+                      <span className="flex-1">{item.name}</span>
+                      <svg
+                        className={`h-4 w-4 text-slate-400 transition-transform ${
+                          showChildren ? 'rotate-180' : ''
+                        }`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    </button>
+                  ) : (
+                    <Link
+                      href={item.href}
+                      onClick={() => {
+                        // Close sidebar on mobile when navigating
+                        if (window.innerWidth < 1024) {
+                          onClose();
+                        }
+                      }}
+                      className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 text-md font-medium transition-colors ${
+                        active
+                          ? 'bg-blue-50 text-blue-700'
+                          : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                      }`}
+                    >
+                      <span
+                        className={`${
+                          active ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-500'
+                        }`}
+                      >
+                        {item.icon}
+                      </span>
+                      <span>{item.name}</span>
+                    </Link>
+                  )}
+                  {showChildren ? (
+                    <div className="mt-1 space-y-1 border-l border-slate-200 pl-5 ml-5">
+                      {item.children?.map((child) => {
+                        const childActive =
+                          child.href === '/invoice'
+                            ? pathname === '/invoice'
+                            : pathname.startsWith(child.href);
+                        return (
+                          <Link
+                            key={child.href}
+                            href={child.href}
+                            onClick={() => {
+                              if (window.innerWidth < 1024) {
+                                onClose();
+                              }
+                            }}
+                            className={`block rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                              childActive
+                                ? 'bg-blue-50 text-blue-700'
+                                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                            }`}
+                          >
+                            {child.name}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
               );
             })}
           </nav>

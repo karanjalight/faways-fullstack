@@ -26,11 +26,15 @@ export default function DebtList({
   const [searchQuery, setSearchQuery] = useState("");
   const [serviceLine, setServiceLine] = useState<"all" | string>("all");
   const [clientFilter, setClientFilter] = useState<"all" | string>("all");
+  const [insuranceFilter, setInsuranceFilter] = useState<"all" | string>("all");
 
   const uniqueServiceLines = Array.from(
     new Set(debts.map((debt) => debt.serviceLine)),
   );
   const uniqueClients = Array.from(new Set(debts.map((debt) => debt.creditor)));
+  const uniqueInsuranceCompanies = Array.from(
+    new Set(debts.map((debt) => debt.payer.trim()).filter(Boolean)),
+  ).sort((a, b) => a.localeCompare(b));
 
   const filteredDebts = debts
     .filter((debt) => {
@@ -41,13 +45,22 @@ export default function DebtList({
       const matchesClient =
         clientFilter === "all" ||
         debt.creditor.toLowerCase() === clientFilter.toLowerCase();
+      const matchesInsurance =
+        insuranceFilter === "all" ||
+        debt.payer.trim().toLowerCase() === insuranceFilter.toLowerCase();
       const matchesSearch =
         searchQuery === "" ||
         debt.creditor.toLowerCase().includes(searchQuery.toLowerCase()) ||
         debt.patientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         debt.patientId.toLowerCase().includes(searchQuery.toLowerCase()) ||
         debt.payer.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesStatus && matchesService && matchesClient && matchesSearch;
+      return (
+        matchesStatus &&
+        matchesService &&
+        matchesClient &&
+        matchesInsurance &&
+        matchesSearch
+      );
     })
     .sort((a, b) => {
       switch (sortBy) {
@@ -105,15 +118,15 @@ export default function DebtList({
         <div className="flex-1">
           <Input
             type="text"
-            placeholder="Search client, patient ID, payer..."
+            placeholder="Search client, patient ID, insurance..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="h-12 rounded-2xl border border-slate-500"
           />
         </div>
 
-        <div className="flex gap-4">
-          <div className="grid flex-1 grid-cols-3 gap-3 lg:flex lg:flex-1">
+        <div className="flex flex-col gap-3 xl:flex-row">
+          <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <select
               value={filter}
               onChange={(e) => setFilter(e.target.value as DebtStatus | "all")}
@@ -149,6 +162,18 @@ export default function DebtList({
                 </option>
               ))}
             </select>
+            <select
+              value={insuranceFilter}
+              onChange={(e) => setInsuranceFilter(e.target.value)}
+              className="h-12 rounded-2xl border border-slate-500 px-4 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Insurance</option>
+              {uniqueInsuranceCompanies.map((company) => (
+                <option key={company} value={company}>
+                  {company}
+                </option>
+              ))}
+            </select>
           </div>
           <select
             value={sortBy}
@@ -170,6 +195,7 @@ export default function DebtList({
               setSearchQuery("");
               setServiceLine("all");
               setClientFilter("all");
+              setInsuranceFilter("all");
             }}
           >
             Reset

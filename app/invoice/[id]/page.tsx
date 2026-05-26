@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 import DashboardLayout from '../../components/DashboardLayout';
 import {
   deleteCommissionInvoiceDocument,
@@ -29,6 +32,10 @@ function formatKes(n: number) {
     currency: 'KES',
     maximumFractionDigits: 0,
   }).format(n);
+}
+
+function safeFilename(input: string) {
+  return input.replace(/[^\w.-]+/g, '_').replace(/^_+|_+$/g, '') || 'invoice';
 }
 
 export default function CommissionInvoiceDetailPage() {
@@ -135,6 +142,95 @@ export default function CommissionInvoiceDetailPage() {
     }
   };
 
+  const exportInvoicePdf = () => {
+    if (!detail) return;
+
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const generatedAt = new Date().toLocaleString('en-KE');
+    const clientName = detail.clientName ?? 'No linked client';
+
+    doc.setFontSize(20);
+    doc.text('FAWAYS COMMISSION INVOICE', 40, 48);
+    doc.setFontSize(10);
+    doc.text(`Invoice: ${detail.reference}`, 40, 70);
+    doc.text(`Client: ${clientName}`, 40, 86);
+    doc.text(
+      `Period: ${new Date(detail.periodStart).toLocaleDateString('en-KE')} - ${new Date(
+        detail.periodEnd,
+      ).toLocaleDateString('en-KE')}`,
+      40,
+      102,
+    );
+    doc.text(`Generated: ${generatedAt}`, 40, 118);
+
+    doc.setFontSize(11);
+    doc.text(`Total recovered: ${formatKes(detail.totalRecovered)}`, 360, 70);
+    doc.setFontSize(13);
+    doc.text(`Commission due: ${formatKes(detail.totalCommission)}`, 360, 90);
+    doc.setFontSize(10);
+    doc.text(`Status: ${detail.status === 'paid' ? 'Paid' : 'Unpaid'}`, 360, 108);
+
+    autoTable(doc, {
+      startY: 150,
+      head: [['Date', 'Case', 'Recovered', 'Commission']],
+      body: detail.lines.map((line) => [
+        line.collectionDate
+          ? new Date(line.collectionDate).toLocaleDateString('en-KE')
+          : '',
+        `${line.creditorName}${line.debtorName ? ` - ${line.debtorName}` : ''}`,
+        formatKes(line.amountRecovered),
+        formatKes(line.commissionAmount),
+      ]),
+      foot: [['', 'Total', formatKes(detail.totalRecovered), formatKes(detail.totalCommission)]],
+      styles: { fontSize: 9, cellPadding: 5 },
+      headStyles: { fillColor: [37, 99, 235] },
+      footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: 'bold' },
+      columnStyles: {
+        2: { halign: 'right' },
+        3: { halign: 'right' },
+      },
+    });
+
+    const finalY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 150;
+    doc.setFontSize(9);
+    doc.text(
+      'This invoice is generated from recorded collections and the client commission terms configured in Faways.',
+      40,
+      Math.min(finalY + 32, 780),
+    );
+
+    doc.save(`${safeFilename(detail.reference)}.pdf`);
+  };
+
+  const exportInvoiceXlsx = () => {
+    if (!detail) return;
+
+    const summaryRows = [
+      { Field: 'Invoice reference', Value: detail.reference },
+      { Field: 'Client', Value: detail.clientName ?? '' },
+      { Field: 'Period start', Value: detail.periodStart },
+      { Field: 'Period end', Value: detail.periodEnd },
+      { Field: 'Total recovered', Value: detail.totalRecovered },
+      { Field: 'Commission due', Value: detail.totalCommission },
+      { Field: 'Status', Value: detail.status === 'paid' ? 'Paid' : 'Unpaid' },
+      { Field: 'Paid at', Value: detail.paidAt ?? '' },
+      { Field: 'Payment note', Value: detail.paidNote ?? '' },
+    ];
+
+    const lineRows = detail.lines.map((line) => ({
+      Date: line.collectionDate,
+      Creditor: line.creditorName,
+      Debtor: line.debtorName,
+      Recovered: line.amountRecovered,
+      Commission: line.commissionAmount,
+    }));
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), 'Summary');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(lineRows), 'Line items');
+    XLSX.writeFile(wb, `${safeFilename(detail.reference)}.xlsx`);
+  };
+
   return (
     <DashboardLayout>
       <div className="min-h-screen bg-slate-50 px-4 py-8">
@@ -161,15 +257,28 @@ export default function CommissionInvoiceDetailPage() {
               )}
             </div>
             {detail && (
-              <Badge
-                className={
-                  detail.status === 'paid'
-                    ? 'rounded-full bg-emerald-100 text-emerald-800'
-                    : 'rounded-full bg-amber-100 text-amber-800'
-                }
-              >
-                {detail.status === 'paid' ? 'Paid' : 'Unpaid'}
-              </Badge>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-xl"
+                  onClick={exportInvoiceXlsx}
+                >
+                  Download Excel
+                </Button>
+                <Button type="button" className="rounded-xl" onClick={exportInvoicePdf}>
+                  Download PDF
+                </Button>
+                <Badge
+                  className={
+                    detail.status === 'paid'
+                      ? 'rounded-full bg-emerald-100 text-emerald-800'
+                      : 'rounded-full bg-amber-100 text-amber-800'
+                  }
+                >
+                  {detail.status === 'paid' ? 'Paid' : 'Unpaid'}
+                </Badge>
+              </div>
             )}
           </div>
 
