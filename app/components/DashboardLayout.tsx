@@ -3,21 +3,17 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
 import Sidebar from './Sidebar';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import UniversalSearch from './UniversalSearch';
+import NotificationBell from './NotificationBell';
 import {
-  Bell,
   ChevronDown,
   Globe2,
   LayoutDashboard,
   LogOut,
   Menu,
-  MoonStar,
-  Search,
   Settings,
-  ShoppingCart,
-  UserRound,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase-client';
 
@@ -26,10 +22,52 @@ interface DashboardLayoutProps {
 }
 
 interface UserState {
+  id: string;
   name: string;
   email: string;
   role: string;
 }
+
+type ProfileRole = 'admin' | 'agent' | 'client' | 'finance';
+
+const normalizeProfileRole = (role: unknown): ProfileRole => {
+  const normalized = typeof role === 'string' ? role.toLowerCase() : '';
+  if (
+    normalized === 'admin' ||
+    normalized === 'agent' ||
+    normalized === 'client' ||
+    normalized === 'finance'
+  ) {
+    return normalized;
+  }
+  return 'client';
+};
+
+const getUserState = (authUser: SupabaseUser): UserState => ({
+  id: authUser.id,
+  name:
+    (authUser.user_metadata?.full_name as string) ||
+    authUser.email?.split('@')[0] ||
+    'User',
+  email: authUser.email || '',
+  role: (authUser.user_metadata?.role as string) || 'Client',
+});
+
+const ensureProfile = async (authUser: SupabaseUser) => {
+  const userState = getUserState(authUser);
+  const { error } = await supabase.from('profiles').upsert(
+    {
+      id: authUser.id,
+      full_name: userState.name,
+      role: normalizeProfileRole(userState.role),
+    },
+    { onConflict: 'id' },
+  );
+
+  if (error) {
+    console.error('Error ensuring dashboard profile', error);
+  }
+};
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const router = useRouter();
@@ -62,11 +100,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         return;
       }
 
-      setUser({
-        name: (user.user_metadata?.full_name as string) || user.email?.split('@')[0] || 'User',
-        email: user.email || '',
-        role: (user.user_metadata?.role as string) || 'Client',
-      });
+      await ensureProfile(user);
+      setUser(getUserState(user));
       setLoadingUser(false);
     }
 
@@ -81,11 +116,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         return;
       }
       const authUser = session.user;
-      setUser({
-        name: (authUser.user_metadata?.full_name as string) || authUser.email?.split('@')[0] || 'User',
-        email: authUser.email || '',
-        role: (authUser.user_metadata?.role as string) || 'Client',
-      });
+      void ensureProfile(authUser);
+      setUser(getUserState(authUser));
     });
 
     return () => {
@@ -138,16 +170,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
           {/* Center: search */}
           <div className="hidden flex-1 items-center px-6 lg:flex">
-            <div className="relative w-full max-w-md">
-              <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-700">
-                <Search className="h-4 w-4" strokeWidth={1.8} />
-              </span>
-              <Input
-                type="search"
-                placeholder="Search"
-                className="h-10 rounded-full border-slate-500 bg-white pl-9 pr-4 text-sm placeholder:text-slate-800"
-              />
-            </div>
+            <UniversalSearch role={user?.role} />
           </div>
 
           {/* Right: language, currency, theme, icons, user */}
@@ -163,12 +186,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               <ChevronDown className="h-3 w-3 text-slate-800" strokeWidth={1.8} />
             </div>
 
-            <button className="relative hidden h-9 w-9 items-center justify-center rounded-full border border-slate-500 bg-white text-slate-600  lg:inline-flex">
-              <Bell className="h-5 w-5" strokeWidth={1.8} />
-              <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white">
-                5
-              </span>
-            </button>
+            <NotificationBell userId={user?.id} />
 
             {/* User */}
             <div className="relative">

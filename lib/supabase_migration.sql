@@ -543,3 +543,134 @@ create policy "storage_commission_invoice_delete_auth"
   to authenticated
   using (bucket_id = 'commission-invoice-documents');
 
+-- =========================
+-- REALTIME IN-APP NOTIFICATIONS
+-- =========================
+-- Debt inserts create notification rows automatically:
+--   - client-created debts alert active Faways staff
+--   - staff-created debts linked to a client alert active users in that client organization
+create index if not exists notifications_user_created_idx
+  on public.notifications (user_id, created_at desc);
+
+create index if not exists profiles_role_active_idx
+  on public.profiles (role, is_active);
+
+create index if not exists profiles_organization_role_idx
+  on public.profiles (organization_id, role);
+
+alter table public.notifications enable row level security;
+
+drop policy if exists "notifications_select_own" on public.notifications;
+create policy "notifications_select_own"
+  on public.notifications
+  for select
+  to authenticated
+  using (user_id = auth.uid());
+
+drop policy if exists "notifications_update_own" on public.notifications;
+create policy "notifications_update_own"
+  on public.notifications
+  for update
+  to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+drop policy if exists "notifications_insert_authenticated" on public.notifications;
+
+create or replace function public.create_debt_insert_notifications()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  creator_role text;
+  client_name text;
+begin
+  select lower(role)
+    into creator_role
+  from public.profiles
+  where id = new.created_by;
+
+  select name
+    into client_name
+  from public.clients
+  where id = new.client_id;
+
+  if creator_role = 'client' then
+    insert into public.notifications (user_id, type, payload)
+    select
+      p.id,
+      'client_debt_submitted',
+      jsonb_build_object(
+        'title', 'New client debt submitted',
+        'body', concat_ws(
+          ' ',
+          coalesce(client_name, new.creditor_name, 'A client'),
+          'submitted a new debt for',
+          coalesce(new.debtor_name, 'a debtor')
+        ),
+        'debtId', new.id,
+        'clientId', new.client_id,
+        'clientName', coalesce(client_name, new.creditor_name),
+        'debtorName', new.debtor_name,
+        'amount', new.amount,
+        'priority', new.priority,
+        'createdBy', new.created_by
+      )
+    from public.profiles p
+    where p.is_active = true
+      and lower(p.role) in ('admin', 'agent', 'finance')
+      and p.id <> new.created_by;
+  elsif new.client_id is not null then
+    insert into public.notifications (user_id, type, payload)
+    select
+      p.id,
+      'debt_assigned_to_client',
+      jsonb_build_object(
+        'title', 'New debt added to your account',
+        'body', concat_ws(
+          ' ',
+          'Faways added a new debt for',
+          coalesce(new.debtor_name, 'your account')
+        ),
+        'debtId', new.id,
+        'clientId', new.client_id,
+        'clientName', coalesce(c.name, new.creditor_name),
+        'debtorName', new.debtor_name,
+        'amount', new.amount,
+        'priority', new.priority,
+        'createdBy', new.created_by
+      )
+    from public.clients c
+    join public.profiles p
+      on p.organization_id = c.organization_id
+    where c.id = new.client_id
+      and p.is_active = true
+      and lower(p.role) = 'client'
+      and (new.created_by is null or p.id <> new.created_by);
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists debt_insert_notifications on public.debts;
+create trigger debt_insert_notifications
+  after insert on public.debts
+  for each row
+  execute function public.create_debt_insert_notifications();
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'notifications'
+  ) then
+    alter publication supabase_realtime add table public.notifications;
+  end if;
+end $$;
+

@@ -1,6 +1,7 @@
 'use client';
 
 import { supabase } from '@/lib/supabase-client';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
 import type { Debt, DebtStatus, CollectionStage } from '../types/debt';
 import { fetchDebtDocumentsWithUrls } from './debtDocuments';
 
@@ -25,6 +26,43 @@ type DebtRow = {
 
 const PATIENT_ID_TAG = 'Patient ID:';
 const INSURANCE_TAG = 'Insurance:';
+type ProfileRole = 'admin' | 'agent' | 'client' | 'finance';
+
+const normalizeProfileRole = (role: unknown): ProfileRole => {
+  const normalized = typeof role === 'string' ? role.toLowerCase() : '';
+  if (
+    normalized === 'admin' ||
+    normalized === 'agent' ||
+    normalized === 'client' ||
+    normalized === 'finance'
+  ) {
+    return normalized;
+  }
+  return 'client';
+};
+
+const ensureCurrentProfile = async (user: SupabaseUser): Promise<string | null> => {
+  const fullName =
+    (user.user_metadata?.full_name as string | undefined) ||
+    user.email?.split('@')[0] ||
+    'User';
+
+  const { error } = await supabase.from('profiles').upsert(
+    {
+      id: user.id,
+      full_name: fullName,
+      role: normalizeProfileRole(user.user_metadata?.role),
+    },
+    { onConflict: 'id' },
+  );
+
+  if (error) {
+    console.error('Error ensuring current profile', error);
+    return null;
+  }
+
+  return user.id;
+};
 
 const extractTaggedValue = (
   text: string | null | undefined,
@@ -237,6 +275,10 @@ export async function createDebt(
   payload: Omit<Debt, 'id' | 'createdAt'>,
 ): Promise<Debt> {
   const now = new Date().toISOString();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const createdBy = user ? await ensureCurrentProfile(user) : null;
   const toInsert = mapDebtToDb({
     ...payload,
     id: '',
@@ -245,7 +287,10 @@ export async function createDebt(
 
   const { data, error } = await supabase
     .from('debts')
-    .insert(toInsert)
+    .insert({
+      ...toInsert,
+      created_by: createdBy,
+    })
     .select(
       'id, client_id, assigned_agent_id, creditor_name, debtor_name, service_line, owner, stage, amount, paid_amount, due_date, status, priority, opened_at, description',
     )
