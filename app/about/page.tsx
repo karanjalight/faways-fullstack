@@ -1,203 +1,240 @@
+import type { Metadata } from "next";
 import Link from "next/link";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { HeartPulse, ShieldCheck, Sparkles, LineChart } from "lucide-react";
+import MarketingLayout from "@/components/landing/MarketingLayout";
+import PageHero from "@/components/landing/PageHero";
+import CTABanner from "@/components/landing/CTABanner";
+import {
+  Shield,
+  Target,
+  Users,
+  Award,
+  CheckCircle2,
+  ArrowRight,
+} from "lucide-react";
+
+export const metadata: Metadata = {
+  title: "About Us | Faways Solutions",
+  description:
+    "Learn about Faways Business Solutions — trusted debt collection and financial management in Kenya since 2013.",
+};
 
 const stats = [
-  { label: "Hospitals & Clinics supported", value: "140+" },
-  { label: "Recovered for clinicians", value: "$68M" },
-  { label: "Median days to collect", value: "34 days" },
-  { label: "NPS with providers", value: "92" },
+  { value: "12+", label: "Years in operation" },
+  { value: "500+", label: "Clients served" },
+  { value: "5", label: "Cities covered" },
+  { value: "98%", label: "Client satisfaction" },
 ];
 
 const values = [
   {
-    icon: ShieldCheck,
-    title: "Regulatory first",
+    icon: Shield,
+    title: "Integrity First",
     description:
-      "Licensed compliance teams ensure every interaction is ethical, well-documented, and audit ready.",
+      "Every recovery action follows Kenyan law and ethical standards. We protect your reputation as fiercely as we pursue your debts.",
   },
   {
-    icon: HeartPulse,
-    title: "Patient empathy",
+    icon: Target,
+    title: "Results Driven",
     description:
-      "We protect long-term provider relationships with compassionate outreach and culturally-aware teams.",
+      "Our no-win-no-fee model means we only succeed when you do. We measure every engagement by recovery rates and client outcomes.",
   },
   {
-    icon: LineChart,
-    title: "Outcome obsession",
+    icon: Users,
+    title: "People Centered",
     description:
-      "Data science pods benchmark every escalation so you see forecasted cash, not guesswork.",
+      "Debt recovery is sensitive work. Our teams balance firmness with professionalism to preserve relationships where possible.",
   },
 ];
 
-const leadership = [
+const team = [
   {
     name: "Faith Wekesa",
-    role: "Founder & CEO",
-    bio: "Built revenue teams for East African health networks before launching Faways in 2013.",
+    role: "Founder & Managing Director",
+    bio: "Founded Faways in 2013 with a mission to professionalize debt recovery in East Africa.",
   },
   {
-    name: "Dr. Collins Atieno",
-    role: "Chief Medical Partnerships",
-    bio: "Former hospital CFO focused on physician group alignment and specialty expansion.",
+    name: "James Otieno",
+    role: "Head of Collections",
+    bio: "15+ years in credit management, leading our recovery operations across Kenya.",
   },
   {
-    name: "Njeri Kwamboka",
-    role: "Head of Analytics",
-    bio: "Leads the Faways Data Studio, surfacing payer risk signals in near-real time.",
+    name: "Grace Wanjiru",
+    role: "Director of Finance",
+    bio: "Oversees bookkeeping, compliance, and financial reporting for corporate clients.",
   },
 ];
 
 const milestones = [
-  { year: "2013", detail: "Faways launches with two Nairobi hospitals." },
-  { year: "2017", detail: "Expands provider enablement to clinics and imaging centers." },
-  { year: "2020", detail: "Opens remote analytics hub serving 5 countries." },
-  { year: "2024", detail: "Introduces Care Collections Cloud for global teams." },
+  { year: "2013", text: "Faways Business Solutions founded in Nairobi." },
+  { year: "2016", text: "Expanded into property management and rent collection." },
+  { year: "2019", text: "Launched credit control consultancy for SMEs." },
+  { year: "2022", text: "Reached 400+ active clients across five counties." },
+  { year: "2024", text: "Introduced digital dashboards for real-time debt tracking." },
 ];
 
 export default function AboutPage() {
   return (
-    <>
-      <Navbar />
-      <main className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-100 pt-32">
-        <section className="px-4 sm:px-6 lg:px-20 pb-16">
-          <div className="grid gap-10 lg:grid-cols-2 items-center">
-            <div className="space-y-6">
-              <Badge variant="secondary" className="rounded-full px-4 py-1 text-xs tracking-wide">
-                About Faways Solutions
-              </Badge>
-              <h1 className="text-4xl lg:text-5xl font-semibold text-slate-900 leading-tight">
-                We build the recovery muscle hospitals and doctors wish they already had.
-              </h1>
-              <p className="text-lg text-slate-600">
-                Since 2013 we have orchestrated enterprise-grade collections, patient outreach, and
-                litigation-ready workflows for the providers that keep East Africa healthy. Every
-                product we ship blends empathy, compliance, and machine-level precision.
-              </p>
-              <div className="flex flex-wrap gap-4">
-                <Button asChild className="rounded-2xl px-6">
-                  <Link href="/services">Explore Services</Link>
-                </Button>
-                <Button asChild variant="outline" className="rounded-2xl px-6">
-                  <Link href="/case-studies">See Case Studies</Link>
-                </Button>
-              </div>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {stats.map((stat) => (
+    <MarketingLayout>
+      <PageHero
+        label="About Us"
+        title="Your Trusted Partner in Debt & Financial Management"
+        description="Since 2013, Faways Business Solutions has helped businesses, landlords, and individuals across Kenya recover debts, manage properties, and build financial stability."
+        cta={{ label: "Work With Us", href: "/consultation" }}
+        image="https://images.unsplash.com/photo-1521737711867-e3b97375f902?w=1200&q=80"
+      />
+
+      <section className="py-20 px-6">
+        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
+          <div>
+            <h2 className="text-3xl font-bold text-[#0A1628] mb-6">
+              Who We Are
+            </h2>
+            <p className="text-gray-600 leading-relaxed mb-4">
+              Faways Business Solutions is a Nairobi-based company specializing in
+              debt collection, rent and property management, bookkeeping, and credit
+              control consultancy. We serve clients across Nairobi, Kiambu, Mombasa,
+              Nakuru, and Eldoret.
+            </p>
+            <p className="text-gray-600 leading-relaxed mb-8">
+              Our tagline — &ldquo;Your Debt Is Our Concern&rdquo; — reflects our
+              commitment to treating every case with urgency, confidentiality, and
+              professionalism. Whether you are a small business chasing overdue
+              invoices or a landlord managing multiple properties, we have the
+              expertise to help.
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              {stats.map((s) => (
                 <div
-                  key={stat.label}
-                  className="rounded-3xl border border-slate-100 bg-white/80 p-6 shadow-sm"
+                  key={s.label}
+                  className="p-5 rounded-2xl bg-white border border-gray-100 shadow-sm"
                 >
-                  <p className="text-3xl font-semibold text-slate-900">{stat.value}</p>
-                  <p className="text-sm text-slate-500">{stat.label}</p>
+                  <p className="text-2xl font-bold text-[#C9A34F]">{s.value}</p>
+                  <p className="text-sm text-gray-500 mt-1">{s.label}</p>
                 </div>
               ))}
             </div>
           </div>
-        </section>
+          <img
+            src="https://images.unsplash.com/photo-1600880292203-757bb62b4baf?w=800&q=80"
+            alt="Faways team at work"
+            className="w-full aspect-[4/3] object-cover rounded-3xl shadow-xl"
+          />
+        </div>
+      </section>
 
-        <section className="px-4 sm:px-6 lg:px-20 pb-16">
-          <div className="rounded-[36px] border border-slate-100 bg-white p-8 shadow-lg shadow-slate-100/70">
-            <div className="flex items-center gap-2 text-slate-500 text-sm">
-              <Sparkles className="h-4 w-4 text-sky-500" />
-              <span>What guides us</span>
-            </div>
-            <h2 className="mt-3 text-3xl font-semibold text-slate-900">Values that scale trust</h2>
-            <div className="mt-8 grid gap-6 md:grid-cols-3">
-              {values.map((value) => (
-                <div key={value.title} className="rounded-3xl border border-slate-100 p-6">
-                  <value.icon className="h-10 w-10 text-sky-600" />
-                  <h3 className="mt-4 text-xl font-semibold text-slate-900">{value.title}</h3>
-                  <p className="mt-2 text-sm text-slate-600">{value.description}</p>
+      <section className="py-20 px-6 bg-white">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center max-w-2xl mx-auto mb-14">
+            <h2 className="text-3xl font-bold text-[#0A1628] mb-4">
+              Our Core Values
+            </h2>
+            <p className="text-gray-600">
+              The principles that guide every interaction with our clients and
+              debtors.
+            </p>
+          </div>
+          <div className="grid md:grid-cols-3 gap-8">
+            {values.map((v) => (
+              <div
+                key={v.title}
+                className="p-8 rounded-3xl bg-[#F9F7F4] border border-gray-100 hover:shadow-lg transition-shadow"
+              >
+                <div className="w-14 h-14 rounded-2xl bg-[#C9A34F] flex items-center justify-center mb-6">
+                  <v.icon className="w-7 h-7 text-[#0A1628]" />
+                </div>
+                <h3 className="text-xl font-bold text-[#0A1628] mb-3">
+                  {v.title}
+                </h3>
+                <p className="text-gray-600 text-sm leading-relaxed">
+                  {v.description}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="team" className="py-20 px-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center max-w-2xl mx-auto mb-14">
+            <h2 className="text-3xl font-bold text-[#0A1628] mb-4">
+              Meet Our Leadership
+            </h2>
+            <p className="text-gray-600">
+              Experienced professionals dedicated to your financial success.
+            </p>
+          </div>
+          <div className="grid md:grid-cols-3 gap-8">
+            {team.map((member) => (
+              <div
+                key={member.name}
+                className="p-8 rounded-3xl bg-white border border-gray-100 shadow-sm text-center"
+              >
+                <div className="w-20 h-20 rounded-full bg-[#0A1628] mx-auto mb-5 flex items-center justify-center text-[#C9A34F] text-2xl font-bold">
+                  {member.name.charAt(0)}
+                </div>
+                <h3 className="text-lg font-bold text-[#0A1628]">
+                  {member.name}
+                </h3>
+                <p className="text-[#C9A34F] text-sm font-medium mb-3">
+                  {member.role}
+                </p>
+                <p className="text-gray-600 text-sm">{member.bio}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="py-20 px-6 bg-white">
+        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16">
+          <div>
+            <h2 className="text-3xl font-bold text-[#0A1628] mb-8">
+              Our Journey
+            </h2>
+            <div className="space-y-6">
+              {milestones.map((m) => (
+                <div key={m.year} className="flex gap-5">
+                  <span className="flex-shrink-0 w-16 h-10 rounded-full bg-[#C9A34F]/15 text-[#C9A34F] font-bold text-sm flex items-center justify-center">
+                    {m.year}
+                  </span>
+                  <p className="text-gray-600 text-sm pt-2">{m.text}</p>
                 </div>
               ))}
             </div>
           </div>
-        </section>
-
-        <section className="px-4 sm:px-6 lg:px-20 pb-16">
-          <div className="grid gap-10 lg:grid-cols-2">
-            <div className="rounded-[36px] border border-slate-100 bg-white p-8 shadow-md">
-              <p className="text-xs uppercase tracking-wide text-slate-500">Leadership</p>
-              <h2 className="mt-2 text-3xl font-semibold text-slate-900">Operators on your side</h2>
-              <div className="mt-6 space-y-6">
-                {leadership.map((leader) => (
-                  <div
-                    key={leader.name}
-                    className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4"
-                  >
-                    <p className="text-lg font-semibold text-slate-900">{leader.name}</p>
-                    <p className="text-sm text-sky-600">{leader.role}</p>
-                    <p className="mt-2 text-sm text-slate-600">{leader.bio}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-[36px] border border-slate-100 bg-white p-8 shadow-md">
-              <p className="text-xs uppercase tracking-wide text-slate-500">Milestones</p>
-              <h2 className="mt-2 text-3xl font-semibold text-slate-900">
-                A decade of resilient growth
-              </h2>
-              <div className="mt-6 space-y-6">
-                {milestones.map((milestone) => (
-                  <div key={milestone.year} className="flex gap-4">
-                    <div className="flex flex-col items-center">
-                      <div className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">
-                        {milestone.year}
-                      </div>
-                      <div className="h-full w-px bg-slate-200" />
-                    </div>
-                    <p className="text-sm text-slate-600">{milestone.detail}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-8 rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">
-                <p>
-                  Ready to see how the next milestone looks? We pair every new engagement with a
-                  blueprint session covering workflow design, staffing pods, and KPIs aligned to your
-                  board.
-                </p>
-                <Button asChild variant="secondary" className="mt-4 rounded-2xl">
-                  <Link href="/contact">Book a chemistry call</Link>
-                </Button>
-              </div>
-            </div>
+          <div className="p-8 rounded-3xl bg-[#0A1628] text-white">
+            <Award className="w-10 h-10 text-[#C9A34F] mb-6" />
+            <h3 className="text-2xl font-bold mb-4">Why Clients Choose Us</h3>
+            <ul className="space-y-4">
+              {[
+                "Licensed and compliant with Kenyan regulations",
+                "No Win, No Fee debt recovery model",
+                "Confidential handling of all cases",
+                "Transparent reporting and documentation",
+                "Dedicated account managers for every client",
+              ].map((item) => (
+                <li key={item} className="flex items-start gap-3 text-sm text-white/80">
+                  <CheckCircle2 className="w-5 h-5 text-[#C9A34F] flex-shrink-0" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <Link
+              href="/services"
+              className="inline-flex items-center gap-2 mt-8 text-[#C9A34F] font-semibold hover:gap-3 transition-all"
+            >
+              Explore our solutions
+              <ArrowRight className="w-4 h-4" />
+            </Link>
           </div>
-        </section>
+        </div>
+      </section>
 
-        <section className="px-4 sm:px-6 lg:px-20 pb-20">
-          <div className="rounded-[36px] border border-slate-100 bg-slate-900 p-10 text-white">
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-slate-400">next move</p>
-                <h2 className="mt-4 text-3xl font-semibold">
-                  Let&apos;s co-design your collections playbook.
-                </h2>
-                <p className="mt-2 text-slate-300">
-                  Bring your CFO, bring your practice managers. We&apos;ll bring the team that blends
-                  human empathy with automation for premium patient finance experiences.
-                </p>
-              </div>
-              <div className="flex gap-4">
-                <Button asChild className="rounded-2xl bg-white text-slate-900 hover:bg-slate-200">
-                  <Link href="/services">View Services</Link>
-                </Button>
-                <Button asChild variant="outline" className="rounded-2xl border-white text-white">
-                  <Link href="/contact">Contact Us</Link>
-                </Button>
-              </div>
-            </div>
-          </div>
-        </section>
-      </main>
-      <Footer />
-    </>
+      <CTABanner
+        title="Ready to Partner With Faways?"
+        description="Schedule a free consultation and discover how we can strengthen your financial position."
+      />
+    </MarketingLayout>
   );
 }
-
-
