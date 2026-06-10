@@ -245,13 +245,13 @@ export default function ConsultationForm() {
               Contact Us Directly
             </h3>
             <a
-              href="tel:+254700000000"
+              href="tel:+254729806234"
               className="flex items-center gap-3 text-gray-600 hover:text-[#C9A34F] transition-colors text-sm"
             >
               <div className="w-10 h-10 rounded-xl bg-[#F9F7F4] flex items-center justify-center">
                 <Phone className="w-4 h-4 text-[#C9A34F]" />
               </div>
-              +254 700 000 000
+              0729 806 234
             </a>
             <a
               href="mailto:info@fawayssolutions.co.ke"
@@ -266,7 +266,7 @@ export default function ConsultationForm() {
               <div className="w-10 h-10 rounded-xl bg-[#F9F7F4] flex items-center justify-center flex-shrink-0">
                 <MapPin className="w-4 h-4 text-[#C9A34F]" />
               </div>
-              Nairobi, Kenya — Serving Nairobi, Kiambu, Mombasa, Nakuru & Eldoret
+              Nairobi, Kenya — Serving Nairobi, Kiambu, Mombasa, Nakuru, Eldoret & Kisumu
             </div>
           </div>
         </div>

@@ -2,6 +2,7 @@
 
 import { supabase } from '@/lib/supabase-client';
 import type { CollectionInvoiceRow } from './commissions';
+import { extractDebtInsuranceFromDescription } from './debts';
 import type {
   CommissionInvoiceDetail,
   CommissionInvoiceDocument,
@@ -192,6 +193,7 @@ export async function createCommissionInvoicesFromLineItems(
         commission_amount: g.commission,
         case_creditor: g.row.creditorName || null,
         case_debtor: g.row.debtorName || null,
+        case_insurance: g.row.insuranceName?.trim() || null,
         collection_date: g.row.collectionDate.slice(0, 10),
       });
       if (lineErr) {
@@ -283,7 +285,20 @@ export async function fetchCommissionInvoiceDetail(
   const { data: lineRows, error: lineErr } = await supabase
     .from('commission_invoice_lines')
     .select(
-      'id, debt_collection_id, amount_recovered, commission_amount, case_creditor, case_debtor, collection_date',
+      `
+      id,
+      debt_collection_id,
+      amount_recovered,
+      commission_amount,
+      case_creditor,
+      case_debtor,
+      case_insurance,
+      collection_date,
+      debt_collections (
+        insurance_name,
+        debts ( description )
+      )
+    `,
     )
     .eq('invoice_id', invoiceId)
     .order('collection_date', { ascending: false });
@@ -302,10 +317,30 @@ export async function fetchCommissionInvoiceDetail(
     commission_amount: number;
     case_creditor: string | null;
     case_debtor: string | null;
+    case_insurance: string | null;
     collection_date: string | null;
+    debt_collections:
+      | {
+          insurance_name: string | null;
+          debts: { description: string | null } | { description: string | null }[] | null;
+        }
+      | {
+          insurance_name: string | null;
+          debts: { description: string | null } | { description: string | null }[] | null;
+        }[]
+      | null;
   };
 
   for (const raw of (lineRows ?? []) as LineRaw[]) {
+    const collection = Array.isArray(raw.debt_collections)
+      ? raw.debt_collections[0]
+      : raw.debt_collections;
+    const debt = collection?.debts
+      ? Array.isArray(collection.debts)
+        ? collection.debts[0]
+        : collection.debts
+      : null;
+
     lines.push({
       lineId: raw.id,
       collectionId: raw.debt_collection_id,
@@ -316,6 +351,11 @@ export async function fetchCommissionInvoiceDetail(
       commissionAmount: Number(raw.commission_amount),
       creditorName: raw.case_creditor ?? '',
       debtorName: raw.case_debtor ?? '',
+      insuranceName:
+        raw.case_insurance?.trim() ||
+        collection?.insurance_name?.trim() ||
+        extractDebtInsuranceFromDescription(debt?.description) ||
+        '',
     });
   }
 

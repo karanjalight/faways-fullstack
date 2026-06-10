@@ -48,6 +48,52 @@ function mapClientRow(row: Record<string, unknown>) {
   };
 }
 
+const clientSelect = `
+  id,
+  name,
+  email,
+  phone,
+  status,
+  region,
+  total_debt,
+  total_paid,
+  last_contact_at,
+  created_at,
+  recovery_commission_type,
+  recovery_commission_percent,
+  recovery_commission_flat
+`;
+
+export async function GET(
+  _req: NextRequest,
+  context: { params: Promise<{ id: string }> },
+) {
+  const supabaseAdmin = getSupabaseAdmin();
+  if (!supabaseAdmin) return notConfigured();
+
+  const { id } = await context.params;
+  if (!id) {
+    return NextResponse.json({ error: 'Missing client id' }, { status: 400 });
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('clients')
+    .select(clientSelect)
+    .eq('id', id)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error loading client', error);
+    return NextResponse.json({ error: 'Failed to load client' }, { status: 500 });
+  }
+
+  if (!data) {
+    return NextResponse.json({ error: 'Client not found' }, { status: 404 });
+  }
+
+  return NextResponse.json(mapClientRow(data as Record<string, unknown>));
+}
+
 export async function PATCH(
   req: NextRequest,
   context: { params: Promise<{ id: string }> },
@@ -106,23 +152,7 @@ export async function PATCH(
     .from('clients')
     .update(patch)
     .eq('id', id)
-    .select(
-      `
-        id,
-        name,
-        email,
-        phone,
-        status,
-        region,
-        total_debt,
-        total_paid,
-        last_contact_at,
-        created_at,
-        recovery_commission_type,
-        recovery_commission_percent,
-        recovery_commission_flat
-      `,
-    )
+    .select(clientSelect)
     .maybeSingle();
 
   if (error) {

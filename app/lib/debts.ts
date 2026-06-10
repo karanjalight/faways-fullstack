@@ -64,6 +64,12 @@ const ensureCurrentProfile = async (user: SupabaseUser): Promise<string | null> 
   return user.id;
 };
 
+export function extractDebtInsuranceFromDescription(
+  text: string | null | undefined,
+): string {
+  return extractTaggedValue(text, INSURANCE_TAG);
+}
+
 const extractTaggedValue = (
   text: string | null | undefined,
   tag: string,

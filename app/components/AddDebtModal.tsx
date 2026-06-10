@@ -16,7 +16,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import type { Debt, DebtDocument, DebtStatus } from '../types/debt';
-import { KENYAN_INSURERS } from '../constants/kenyanInsurers';
+import { addCustomInsurer } from '../constants/kenyanInsurers';
+import InsuranceSelect from './InsuranceSelect';
 import { fetchAgents } from '../../lib/agents';
 import type { Agent } from '../types/agent';
 
@@ -61,7 +62,6 @@ export default function AddDebtModal({
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [lockedClientName, setLockedClientName] = useState<string | null>(null);
-  const [insuranceSearch, setInsuranceSearch] = useState('');
   const [agents, setAgents] = useState<Agent[]>([]);
   const [isLoadingAgents, setIsLoadingAgents] = useState(false);
 
@@ -232,6 +232,10 @@ export default function AddDebtModal({
 
     const selectedAgent = agents.find((agent) => agent.name === formData.owner);
 
+    if (formData.payer.trim()) {
+      addCustomInsurer(formData.payer);
+    }
+
     onSave({
       clientId: selectedClientId,
       assignedAgentId: selectedAgent?.id,
@@ -370,31 +374,12 @@ export default function AddDebtModal({
               <Label>
                 Payer / Insurance <span className="text-rose-500">*</span>
               </Label>
-              <div className="space-y-2">
-                <Input
-                  placeholder="Search insurer…"
-                  value={insuranceSearch}
-                  onChange={(e) => setInsuranceSearch(e.target.value)}
-                  className="h-9 rounded-2xl border-slate-200 text-xs"
-                />
-                <select
-                  value={formData.payer}
-                  onChange={(e) =>
-                    setFormData({ ...formData, payer: e.target.value })
-                  }
-                  className="h-11 w-full rounded-2xl border border-slate-200 px-4 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                >
-                  <option value="">Select insurer…</option>
-                  {KENYAN_INSURERS.filter((name) =>
-                    name.toLowerCase().includes(insuranceSearch.toLowerCase()),
-                  ).map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <InsuranceSelect
+                value={formData.payer}
+                onChange={(payer) => setFormData({ ...formData, payer })}
+                required
+                showSearch
+              />
             </div>
           </section>
 

@@ -14,7 +14,8 @@ import {
 import { createClientApi, fetchClientByEmail, fetchClients } from '../../lib/clients';
 import { fetchAgents } from '../../../lib/agents';
 import type { Agent } from '../../types/agent';
-import { KENYAN_INSURERS } from '../../constants/kenyanInsurers';
+import { addCustomInsurer } from '../../constants/kenyanInsurers';
+import InsuranceSelect from '../../components/InsuranceSelect';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -300,6 +301,10 @@ export default function NewDebtPage() {
           setIsSubmitting(false);
           return;
         }
+      }
+
+      if (formData.payer.trim()) {
+        addCustomInsurer(formData.payer);
       }
 
       const created = await createDebt({
@@ -663,26 +668,16 @@ export default function NewDebtPage() {
                         <span className="text-rose-500"> *</span>
                       )}
                     </Label>
-                    <select
+                    <InsuranceSelect
                       value={formData.payer}
-                      onChange={(e) =>
-                        setFormData((prev) => ({ ...prev, payer: e.target.value }))
+                      onChange={(payer) =>
+                        setFormData((prev) => ({ ...prev, payer }))
                       }
-                      className="h-11 w-full rounded-2xl border border-slate-200 px-4 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       required={
                         formData.debtorKind === 'patient' &&
                         formData.debtSource !== 'newspaper-lead'
                       }
-                    >
-                      <option value="">Select insurance provider</option>
-                      {KENYAN_INSURERS.map((insurer) => (
-                        <option key={insurer} value={insurer}>
-                          {insurer}
-                        </option>
-                      ))}
-                      <option value="Self Pay">Self Pay</option>
-                      <option value="Other">Other</option>
-                    </select>
+                    />
                   </div>
                 </div>
 

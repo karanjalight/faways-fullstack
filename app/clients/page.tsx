@@ -16,9 +16,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { fetchClients, createClientApi, updateClientApi } from "../lib/clients";
+import ClientCredentialsModal from "../components/ClientCredentialsModal";
 import { fetchDebts } from "../lib/debts";
 import { useRouter } from "next/navigation";
 import type { Debt } from "../types/debt";
+import { formatKes } from "@/lib/format-kes";
+import KshIcon from "../components/KshIcon";
 
 export default function ClientsPage() {
   const router = useRouter();
@@ -33,6 +36,7 @@ export default function ClientsPage() {
   const [creationCredentials, setCreationCredentials] = useState<{
     email: string;
     password: string;
+    clientName: string;
   } | null>(null);
 
   useEffect(() => {
@@ -97,16 +101,6 @@ export default function ClientsPage() {
         client.assignedAgent?.toLowerCase().includes(query)
     );
   }, [clientsWithLiveBalances, searchQuery]);
-
-  // Format currency
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
 
   // Format date
   const formatDate = (dateString: string) => {
@@ -259,7 +253,10 @@ export default function ClientsPage() {
           recoveryCommissionFlat: clientData.recoveryCommissionFlat,
         });
         setClients((prev) => [client, ...prev]);
-        setCreationCredentials(credentials);
+        setCreationCredentials({
+          ...credentials,
+          clientName: client.name,
+        });
       } catch (error) {
         console.error(error);
         alert((error as Error).message);
@@ -300,7 +297,7 @@ export default function ClientsPage() {
       header: 'Total Debt',
       accessor: (client: Client) => (
         <span className="font-semibold text-gray-900">
-          {formatCurrency(client.totalDebt)}
+          {formatKes(client.totalDebt)}
         </span>
       ),
     },
@@ -310,11 +307,11 @@ export default function ClientsPage() {
         <div>
           <div className="text-sm">
             <span className="font-medium text-green-600">
-              {formatCurrency(client.paidAmount)}
+              {formatKes(client.paidAmount)}
             </span>
             {' / '}
             <span className="text-red-600">
-              {formatCurrency(client.remainingAmount)}
+              {formatKes(client.remainingAmount)}
             </span>
           </div>
           <ProgressBar paid={client.paidAmount} total={client.totalDebt} />
@@ -390,19 +387,29 @@ export default function ClientsPage() {
             </CardHeader>
           </Card>
           <Card className="rounded-3xl">
-            <CardHeader>
-              <CardDescription>Total Exposure</CardDescription>
-              <CardTitle className="text-2xl">
-                {formatCurrency(metrics.totalExposure)}
-              </CardTitle>
+            <CardHeader className="flex flex-row items-start justify-between space-y-0">
+              <div>
+                <CardDescription>Total Exposure</CardDescription>
+                <CardTitle className="text-2xl">
+                  {formatKes(metrics.totalExposure)}
+                </CardTitle>
+              </div>
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                <KshIcon />
+              </div>
             </CardHeader>
           </Card>
           <Card className="rounded-3xl">
-            <CardHeader>
-              <CardDescription>Remaining Balance</CardDescription>
-              <CardTitle className="text-2xl text-rose-600">
-                {formatCurrency(metrics.remaining)}
-              </CardTitle>
+            <CardHeader className="flex flex-row items-start justify-between space-y-0">
+              <div>
+                <CardDescription>Remaining Balance</CardDescription>
+                <CardTitle className="text-2xl text-rose-600">
+                  {formatKes(metrics.remaining)}
+                </CardTitle>
+              </div>
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-rose-50 text-rose-600">
+                <KshIcon />
+              </div>
             </CardHeader>
           </Card>
           <Card className="rounded-3xl">
@@ -457,85 +464,15 @@ export default function ClientsPage() {
         />
 
         {creationCredentials && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-            <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200/80">
-              <div className="border-b border-slate-200 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-6 py-4">
-                <h2 className="text-sm font-semibold text-white">
-                  Client account created
-                </h2>
-                <p className="mt-1 text-xs text-slate-200/80">
-                  Share these credentials securely with your client. They have been
-                  provisioned with a <span className="font-semibold">client</span> role.
-                </p>
-              </div>
-              <div className="space-y-4 px-6 py-5 text-sm">
-                <div className="grid gap-3 sm:grid-cols-1">
-                  <div>
-                    <p className="text-blue-900">Login email</p>
-                    <p className="break-all font-mono text-xs text-slate-900">
-                      {creationCredentials.email}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-blue-900">Temporary password</p>
-                    <p className="font-mono text-xs text-slate-900">
-                      {creationCredentials.password}
-                    </p>
-                  </div>
-                </div>
-                <div className="rounded-lg bg-slate-50 p-3 text-[11px] text-slate-600">
-                  Ask the client to log in and change this password on first access. The
-                  password will only be shown once in this dialog.
-                </div>
-              </div>
-              <div className="flex flex-col gap-3 border-t border-slate-200 px-6 py-4 sm:flex-row-reverse">
-                <button
-                  className="inline-flex w-20 items-center justify-center rounded-full bg-blue-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:ring-offset-white sm:w-auto"
-                  onClick={async () => {
-                    const message = `Welcome to Faways portal.\n\nLogin email: ${creationCredentials.email}\nTemporary password: ${creationCredentials.password}\n\nPlease log in and update your password.`;
-                    try {
-                      await navigator.clipboard.writeText(message);
-                      alert("Message copied to clipboard.");
-                    } catch {
-                      alert("Unable to copy. Please copy manually.");
-                    }
-                  }}
-                >
-                  Copy 
-                </button>
-                <button
-                  className="inline-flex w-40 items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-2.5 text-xs font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-1 focus:ring-offset-white sm:w-auto"
-                  onClick={() => {
-                    if (!creationCredentials) return;
-                    const content = `Client login credentials\n\nEmail: ${creationCredentials.email}\nTemporary password: ${creationCredentials.password}\n\nPlease change your password after first login.`;
-                    try {
-                      const blob = new Blob([content], {
-                        type: "text/plain;charset=utf-8",
-                      });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement("a");
-                      a.href = url;
-                      a.download = "client-credentials.txt";
-                      document.body.appendChild(a);
-                      a.click();
-                      document.body.removeChild(a);
-                      URL.revokeObjectURL(url);
-                    } catch {
-                      alert("Unable to start download. Please try again.");
-                    }
-                  }}
-                >
-                  Download
-                </button>
-                <button
-                  className="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
-                  onClick={() => setCreationCredentials(null)}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
+          <ClientCredentialsModal
+            credentials={{
+              email: creationCredentials.email,
+              password: creationCredentials.password,
+            }}
+            clientName={creationCredentials.clientName}
+            purpose="new_account"
+            onClose={() => setCreationCredentials(null)}
+          />
         )}
 
         <ClientDetailModal

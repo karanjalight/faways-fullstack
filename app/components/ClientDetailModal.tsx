@@ -2,6 +2,7 @@
 "use client";
 
 import { Client } from "../types/client";
+import { formatKes } from "@/lib/format-kes";
 
 interface ClientDetailModalProps {
   isOpen: boolean;
@@ -19,15 +20,6 @@ export default function ClientDetailModal({
   onDelete,
 }: ClientDetailModalProps) {
   if (!isOpen || !client) return null;
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -115,19 +107,19 @@ export default function ClientDetailModal({
               <div className="flex justify-between">
                 <span className="text-sm text-slate-600">Total Debt:</span>
                 <span className="font-semibold text-slate-900">
-                  {formatCurrency(client.totalDebt)}
+                  {formatKes(client.totalDebt)}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-slate-600">Paid Amount:</span>
                 <span className="font-semibold text-emerald-600">
-                  {formatCurrency(client.paidAmount)}
+                  {formatKes(client.paidAmount)}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-slate-600">Remaining:</span>
                 <span className="font-semibold text-rose-600">
-                  {formatCurrency(client.remainingAmount)}
+                  {formatKes(client.remainingAmount)}
                 </span>
               </div>
               <div className="mt-3">

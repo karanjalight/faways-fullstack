@@ -44,6 +44,8 @@ import {
   TabsContent,
 } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { addCustomInsurer } from '../../../constants/kenyanInsurers';
+import InsuranceSelect from '../../../components/InsuranceSelect';
 
 type PendingDebtDocument = {
   id: string;
@@ -248,19 +250,6 @@ export default function DebtDetailPage() {
       maximumFractionDigits: 0,
     }).format(value);
 
-  const kenyaInsurers = [
-    'Jubilee Health Insurance',
-    'AAR Insurance',
-    'Britam Insurance',
-    'CIC Insurance',
-    'APA Insurance',
-    'Madison Insurance',
-    'UAP Old Mutual',
-    'Resolution Insurance',
-    'First Assurance',
-    'Kenindia Assurance',
-  ];
-
   const handleDeleteCollection = async (collection: DebtCollection) => {
     if (!debt || deletingCollectionId) return;
 
@@ -418,6 +407,10 @@ export default function DebtDetailPage() {
     }
 
     try {
+      if (newCollectionInsurance.trim()) {
+        addCustomInsurer(newCollectionInsurance);
+      }
+
       const created = await createCollection({
         debtId: id,
         amount,
@@ -1035,20 +1028,13 @@ export default function DebtDetailPage() {
                           </div>
                           <div className="space-y-1">
                             <Label className="text-xs">Insurance</Label>
-                            <select
+                            <InsuranceSelect
                               value={newCollectionInsurance}
-                              onChange={(e) =>
-                                setNewCollectionInsurance(e.target.value)
-                              }
-                              className="h-10 w-full rounded-2xl border border-slate-300 px-3 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                              <option value="">Select insurer</option>
-                              {kenyaInsurers.map((name) => (
-                                <option key={name} value={name}>
-                                  {name}
-                                </option>
-                              ))}
-                            </select>
+                              onChange={setNewCollectionInsurance}
+                              showSearch
+                              selectClassName="h-10 w-full rounded-2xl border border-slate-300 px-3 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              inputClassName="h-10 rounded-2xl border-slate-300 text-xs"
+                            />
                           </div>
                           <div className="space-y-1">
                             <Label className="text-xs">Notes</Label>

@@ -15,14 +15,14 @@ const contactChannels = [
   {
     icon: Phone,
     title: "Talk to an advisor",
-    description: "+254 700 123 456",
-    href: "tel:+254700123456",
+    description: "0729 806 234",
+    href: "tel:+254729806234",
   },
   {
     icon: Mail,
     title: "Send documentation",
-    description: "hello@fawayssolutions.co.ke",
-    href: "mailto:hello@fawayssolutions.co.ke",
+    description: "info@fawayssolutions.co.ke",
+    href: "mailto:info@fawayssolutions.co.ke",
   },
   {
     icon: Building,
@@ -162,7 +162,7 @@ export default function ContactPage() {
                 <p className="text-xs uppercase tracking-[0.3em] text-slate-400">where we work</p>
                 <h2 className="mt-4 text-3xl font-semibold">Nairobi HQ, distributed reach</h2>
                 <p className="mt-2 text-slate-300">
-                  Onsite pods embed inside hospitals across Nairobi, Kiambu, Nakuru, Eldoret, and Mombasa while our remote
+                  Onsite pods embed inside hospitals across Nairobi, Kiambu, Nakuru, Eldoret, Mombasa, and Kisumu while our remote
                   Command Center covers pan-African and global providers.
                 </p>
               </div>
@@ -173,11 +173,15 @@ export default function ContactPage() {
                 </div>
                 <div className="flex gap-3">
                   <Phone className="h-5 w-5 text-sky-400" />
-                  <span>+254 700 123 456</span>
+                  <a href="tel:+254729806234" className="hover:text-sky-400 transition-colors">
+                    0729 806 234
+                  </a>
                 </div>
                 <div className="flex gap-3">
                   <Mail className="h-5 w-5 text-sky-400" />
-                  <span>hello@fawayssolutions.co.ke</span>
+                  <a href="mailto:info@fawayssolutions.co.ke" className="hover:text-sky-400 transition-colors">
+                    info@fawayssolutions.co.ke
+                  </a>
                 </div>
               </div>
             </div>

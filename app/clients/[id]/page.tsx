@@ -2,23 +2,23 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { Eye, EyeOff, KeyRound, Plus, RefreshCw, Shield } from "lucide-react";
 import DashboardLayout from "../../components/DashboardLayout";
+import ClientCredentialsModal from "../../components/ClientCredentialsModal";
 import type { Client, RecoveryCommissionType } from "../../types/client";
 import type { Debt } from "../../types/debt";
+import type { ClientAccount, ClientCredentials } from "../../types/clientAccount";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { fetchDebts } from "../../lib/debts";
 import { updateClientApi } from "../../lib/clients";
-
-function formatCurrency(amount: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
+import {
+  createClientAccount,
+  fetchClientAccounts,
+  resetClientAccountPassword,
+} from "../../lib/clientAccounts";
+import { formatKes } from "@/lib/format-kes";
 
 function formatDate(dateString: string) {
   return new Date(dateString).toLocaleDateString("en-US", {
@@ -26,14 +26,6 @@ function formatDate(dateString: string) {
     day: "numeric",
     year: "numeric",
   });
-}
-
-function formatKes(amount: number) {
-  return new Intl.NumberFormat("en-KE", {
-    style: "currency",
-    currency: "KES",
-    maximumFractionDigits: 0,
-  }).format(amount);
 }
 
 export default function ClientDetailPage() {
@@ -49,6 +41,23 @@ export default function ClientDetailPage() {
   const [commissionFlat, setCommissionFlat] = useState("");
   const [isSavingCommission, setIsSavingCommission] = useState(false);
   const [commissionMessage, setCommissionMessage] = useState<string | null>(null);
+  const [accounts, setAccounts] = useState<ClientAccount[]>([]);
+  const [isLoadingAccounts, setIsLoadingAccounts] = useState(false);
+  const [accountsError, setAccountsError] = useState<string | null>(null);
+  const [showCreateAccount, setShowCreateAccount] = useState(false);
+  const [newContactName, setNewContactName] = useState("");
+  const [newAccountEmail, setNewAccountEmail] = useState("");
+  const [newAccountPhone, setNewAccountPhone] = useState("");
+  const [newAccountPassword, setNewAccountPassword] = useState("");
+  const [newAccountConfirmPassword, setNewAccountConfirmPassword] = useState("");
+  const [showNewAccountPassword, setShowNewAccountPassword] = useState(false);
+  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
+  const [resettingUserId, setResettingUserId] = useState<string | null>(null);
+  const [issuedCredentials, setIssuedCredentials] = useState<{
+    credentials: ClientCredentials;
+    contactName?: string;
+    purpose: "new_account" | "password_reset";
+  } | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -101,6 +110,25 @@ export default function ClientDetailPage() {
       load();
     }
   }, [params.id]);
+
+  useEffect(() => {
+    const loadAccounts = async () => {
+      if (!params.id || !client) return;
+      setIsLoadingAccounts(true);
+      setAccountsError(null);
+      try {
+        const data = await fetchClientAccounts(params.id);
+        setAccounts(data);
+      } catch (e) {
+        console.error(e);
+        setAccountsError("Unable to load portal accounts.");
+      } finally {
+        setIsLoadingAccounts(false);
+      }
+    };
+
+    loadAccounts();
+  }, [params.id, client?.id]);
 
   const statusStyles: Record<Client["status"], string> = {
     active: "bg-blue-100 text-blue-800",
@@ -184,6 +212,77 @@ export default function ClientDetailPage() {
       alert((e as Error).message);
     } finally {
       setIsSavingCommission(false);
+    }
+  };
+
+  const handleCreateAccount = async () => {
+    if (!params.id || !client) return;
+    if (!newContactName.trim() || !newAccountEmail.trim() || !newAccountPassword.trim()) {
+      alert("Contact name, email and password are required.");
+      return;
+    }
+
+    if (newAccountPassword.length < 8) {
+      alert("Password must be at least 8 characters.");
+      return;
+    }
+
+    if (newAccountPassword !== newAccountConfirmPassword) {
+      alert("Passwords do not match.");
+      return;
+    }
+
+    setIsCreatingAccount(true);
+    try {
+      const { account, credentials } = await createClientAccount(params.id, {
+        contactName: newContactName.trim(),
+        email: newAccountEmail.trim(),
+        password: newAccountPassword,
+        phone: newAccountPhone.trim() || undefined,
+      });
+      setAccounts((prev) => [...prev, account]);
+      setIssuedCredentials({
+        credentials,
+        contactName: newContactName.trim(),
+        purpose: "new_account",
+      });
+      setShowCreateAccount(false);
+      setNewContactName("");
+      setNewAccountEmail("");
+      setNewAccountPhone("");
+      setNewAccountPassword("");
+      setNewAccountConfirmPassword("");
+    } catch (e) {
+      console.error(e);
+      alert((e as Error).message);
+    } finally {
+      setIsCreatingAccount(false);
+    }
+  };
+
+  const handleResetPassword = async (account: ClientAccount) => {
+    if (!params.id || !client) return;
+    if (
+      !confirm(
+        `Reset the password for ${account.email}? The user will need the new temporary password to sign in.`,
+      )
+    ) {
+      return;
+    }
+
+    setResettingUserId(account.id);
+    try {
+      const { credentials } = await resetClientAccountPassword(params.id, account.id);
+      setIssuedCredentials({
+        credentials,
+        contactName: account.fullName || undefined,
+        purpose: "password_reset",
+      });
+    } catch (e) {
+      console.error(e);
+      alert((e as Error).message);
+    } finally {
+      setResettingUserId(null);
     }
   };
 
@@ -279,19 +378,19 @@ export default function ClientDetailPage() {
               <div className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
                 <p className="text-xs uppercase tracking-wide text-slate-500">Total debt</p>
                 <p className="mt-2 text-2xl font-semibold text-slate-900">
-                  {formatCurrency(client.totalDebt)}
+                  {formatKes(client.totalDebt)}
                 </p>
               </div>
               <div className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
                 <p className="text-xs uppercase tracking-wide text-slate-500">Collected</p>
                 <p className="mt-2 text-2xl font-semibold text-emerald-600">
-                  {formatCurrency(client.paidAmount)}
+                  {formatKes(client.paidAmount)}
                 </p>
               </div>
               <div className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
                 <p className="text-xs uppercase tracking-wide text-slate-500">Outstanding</p>
                 <p className="mt-2 text-2xl font-semibold text-rose-600">
-                  {formatCurrency(client.remainingAmount)}
+                  {formatKes(client.remainingAmount)}
                 </p>
               </div>
               <div className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
@@ -395,6 +494,185 @@ export default function ClientDetailPage() {
               )}
             </div>
 
+            <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Shield className="h-4 w-4 text-blue-800" />
+                    <h2 className="text-base font-semibold text-slate-900">
+                      Portal accounts
+                    </h2>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Create login access for this client organization, reset passwords,
+                    and download credentials as a PDF.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  className="shrink-0 rounded-full bg-blue-800 hover:bg-blue-900"
+                  onClick={() => {
+                    setShowCreateAccount((open) => !open);
+                    if (!showCreateAccount && client) {
+                      setNewContactName(client.name);
+                      setNewAccountEmail(client.email);
+                      setNewAccountPhone(client.phone);
+                    }
+                  }}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create account
+                </Button>
+              </div>
+
+              {showCreateAccount && (
+                <div className="mb-4 grid gap-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label className="text-xs">Contact name</Label>
+                    <Input
+                      value={newContactName}
+                      onChange={(e) => setNewContactName(e.target.value)}
+                      placeholder="e.g. Jane Doe"
+                      className="rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Login email</Label>
+                    <Input
+                      type="email"
+                      value={newAccountEmail}
+                      onChange={(e) => setNewAccountEmail(e.target.value)}
+                      placeholder="user@client.com"
+                      className="rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Phone (optional)</Label>
+                    <Input
+                      value={newAccountPhone}
+                      onChange={(e) => setNewAccountPhone(e.target.value)}
+                      placeholder="+254..."
+                      className="rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Password</Label>
+                    <div className="relative">
+                      <Input
+                        type={showNewAccountPassword ? "text" : "password"}
+                        value={newAccountPassword}
+                        onChange={(e) => setNewAccountPassword(e.target.value)}
+                        placeholder="At least 8 characters"
+                        className="rounded-xl pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewAccountPassword((v) => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                        aria-label={showNewAccountPassword ? "Hide password" : "Show password"}
+                      >
+                        {showNewAccountPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label className="text-xs">Confirm password</Label>
+                    <Input
+                      type={showNewAccountPassword ? "text" : "password"}
+                      value={newAccountConfirmPassword}
+                      onChange={(e) => setNewAccountConfirmPassword(e.target.value)}
+                      placeholder="Re-enter password"
+                      className="rounded-xl"
+                    />
+                  </div>
+                  <div className="flex items-end gap-2 md:col-span-2">
+                    <Button
+                      type="button"
+                      className="rounded-xl"
+                      disabled={isCreatingAccount}
+                      onClick={handleCreateAccount}
+                    >
+                      {isCreatingAccount ? "Creating…" : "Provision account"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="rounded-xl"
+                      disabled={isCreatingAccount}
+                      onClick={() => setShowCreateAccount(false)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {isLoadingAccounts && (
+                <p className="text-sm text-slate-500">Loading portal accounts…</p>
+              )}
+              {accountsError && !isLoadingAccounts && (
+                <p className="text-sm text-red-600">{accountsError}</p>
+              )}
+              {!isLoadingAccounts && !accountsError && accounts.length === 0 && (
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                  No portal accounts yet. Create one so this client can sign in and
+                  track their debts.
+                </div>
+              )}
+              {!isLoadingAccounts && accounts.length > 0 && (
+                <div className="space-y-3">
+                  {accounts.map((account) => (
+                    <div
+                      key={account.id}
+                      className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium text-slate-900">
+                            {account.fullName || "Portal user"}
+                          </p>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                              account.isActive
+                                ? "bg-emerald-100 text-emerald-700"
+                                : "bg-slate-100 text-slate-600"
+                            }`}
+                          >
+                            {account.isActive ? "Active" : "Inactive"}
+                          </span>
+                        </div>
+                        <p className="mt-1 break-all font-mono text-xs text-slate-600">
+                          {account.email}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-400">
+                          Created {formatDate(account.createdAt)}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="shrink-0 rounded-full"
+                        disabled={resettingUserId === account.id}
+                        onClick={() => handleResetPassword(account)}
+                      >
+                        {resettingUserId === account.id ? (
+                          <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <KeyRound className="mr-2 h-4 w-4" />
+                        )}
+                        Reset password
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="grid gap-6 lg:grid-cols-[3fr,2fr]">
               <div className="space-y-4 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-100">
               <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
@@ -404,19 +682,19 @@ export default function ClientDetailPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-slate-600">Total debt</span>
                   <span className="text-lg font-semibold text-slate-900">
-                    {formatCurrency(client.totalDebt)}
+                    {formatKes(client.totalDebt)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-slate-600">Collected</span>
                   <span className="text-sm font-semibold text-emerald-600">
-                    {formatCurrency(client.paidAmount)}
+                    {formatKes(client.paidAmount)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-slate-600">Outstanding</span>
                   <span className="text-sm font-semibold text-rose-600">
-                    {formatCurrency(client.remainingAmount)}
+                    {formatKes(client.remainingAmount)}
                   </span>
                 </div>
               </div>
@@ -516,11 +794,11 @@ export default function ClientDetailPage() {
                       </div>
                       <div className="mt-2 flex items-center justify-between text-sm">
                         <span className="text-slate-500">
-                          Paid {formatCurrency(debt.paidAmount)} /{" "}
-                          {formatCurrency(debt.amount)}
+                          Paid {formatKes(debt.paidAmount)} /{" "}
+                          {formatKes(debt.amount)}
                         </span>
                         <span className="font-semibold text-rose-600">
-                          Remaining {formatCurrency(debt.amount - debt.paidAmount)}
+                          Remaining {formatKes(debt.amount - debt.paidAmount)}
                         </span>
                       </div>
                     </button>
@@ -529,6 +807,16 @@ export default function ClientDetailPage() {
               )}
             </div>
           </div>
+        )}
+
+        {issuedCredentials && client && (
+          <ClientCredentialsModal
+            credentials={issuedCredentials.credentials}
+            clientName={client.name}
+            contactName={issuedCredentials.contactName}
+            purpose={issuedCredentials.purpose}
+            onClose={() => setIssuedCredentials(null)}
+          />
         )}
       </div>
     </DashboardLayout>

@@ -9,6 +9,7 @@ import AgentDetailModal from '../components/AgentDetailModal';
 import { Agent } from '../types/agent';
 import { fetchAgents, createAgent, updateAgent, deleteAgent } from '../../lib/agents';
 import { Button } from '@/components/ui/button';
+import { formatKes } from '@/lib/format-kes';
 
 export default function AgentsPage() {
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -44,16 +45,6 @@ export default function AgentsPage() {
         agent.department.toLowerCase().includes(query)
     );
   }, [agents, searchQuery]);
-
-  // Format currency
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
 
   // Format date
   const formatDate = (dateString: string) => {
@@ -186,7 +177,7 @@ export default function AgentsPage() {
       header: 'Total Collected',
       accessor: (agent: Agent) => (
         <span className="font-semibold text-green-600">
-          {formatCurrency(agent.totalCollected)}
+          {formatKes(agent.totalCollected)}
         </span>
       ),
     },

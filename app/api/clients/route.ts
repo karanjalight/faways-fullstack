@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
+import { generatePassword } from '@/lib/password';
 
 type RecoveryCommissionType = 'percent' | 'flat';
 
@@ -46,17 +47,6 @@ function notConfigured() {
     },
     { status: 503 },
   );
-}
-
-// Helper to generate a random password
-function generatePassword(length = 16) {
-  const charset =
-    'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+';
-  let pwd = '';
-  for (let i = 0; i < length; i++) {
-    pwd += charset[Math.floor(Math.random() * charset.length)];
-  }
-  return pwd;
 }
 
 export async function GET(req: NextRequest) {

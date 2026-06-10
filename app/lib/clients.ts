@@ -17,6 +17,22 @@ export async function fetchClients(): Promise<Client[]> {
   return (await res.json()) as Client[];
 }
 
+export async function fetchClientById(id: string): Promise<Client> {
+  const res = await fetch(`/api/clients/${id}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.error ?? 'Failed to load client');
+  }
+
+  return (await res.json()) as Client;
+}
+
 export async function fetchClientByEmail(email: string): Promise<Client | null> {
   const normalized = email.trim().toLowerCase();
   if (!normalized) return null;

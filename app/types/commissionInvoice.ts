@@ -23,6 +23,15 @@ export interface CommissionInvoiceLineDetail {
   commissionAmount: number;
   creditorName: string;
   debtorName: string;
+  insuranceName: string;
+}
+
+export function formatInvoiceLineInsurance(line: Pick<CommissionInvoiceLineDetail, 'insuranceName'>): string {
+  return line.insuranceName.trim() || '—';
+}
+
+export function formatInvoiceLinePatient(line: Pick<CommissionInvoiceLineDetail, 'debtorName'>): string {
+  return line.debtorName.trim() || '—';
 }
 
 export interface CommissionInvoiceDocument {

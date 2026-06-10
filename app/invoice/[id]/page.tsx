@@ -15,6 +15,10 @@ import {
   uploadCommissionInvoiceDocument,
 } from '../../lib/commissionInvoices';
 import type { CommissionInvoiceDetail } from '../../types/commissionInvoice';
+import {
+  formatInvoiceLineInsurance,
+  formatInvoiceLinePatient,
+} from '../../types/commissionInvoice';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -208,22 +212,31 @@ export default function CommissionInvoiceDetailPage() {
 
     autoTable(doc, {
       startY: 150,
-      head: [['Date', 'Case', 'Recovered', 'Commission']],
+      head: [['Date', 'Insurance', 'Patient', 'Recovered', 'Commission']],
       body: detail.lines.map((line) => [
         line.collectionDate
           ? new Date(line.collectionDate).toLocaleDateString('en-KE')
           : '',
-        `${line.creditorName}${line.debtorName ? ` - ${line.debtorName}` : ''}`,
+        formatInvoiceLineInsurance(line),
+        formatInvoiceLinePatient(line),
         formatKes(line.amountRecovered),
         formatKes(line.commissionAmount),
       ]),
-      foot: [['', 'Total', formatKes(detail.totalRecovered), formatKes(detail.totalCommission)]],
+      foot: [
+        [
+          '',
+          '',
+          'Total',
+          formatKes(detail.totalRecovered),
+          formatKes(detail.totalCommission),
+        ],
+      ],
       styles: { fontSize: 9, cellPadding: 5 },
       headStyles: { fillColor: [37, 99, 235] },
       footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: 'bold' },
       columnStyles: {
-        2: { halign: 'right' },
         3: { halign: 'right' },
+        4: { halign: 'right' },
       },
     });
 
@@ -255,8 +268,8 @@ export default function CommissionInvoiceDetailPage() {
 
     const lineRows = detail.lines.map((line) => ({
       Date: line.collectionDate,
-      Creditor: line.creditorName,
-      Debtor: line.debtorName,
+      Insurance: formatInvoiceLineInsurance(line),
+      Patient: formatInvoiceLinePatient(line),
       Recovered: line.amountRecovered,
       Commission: line.commissionAmount,
     }));
@@ -506,11 +519,12 @@ export default function CommissionInvoiceDetailPage() {
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[640px] text-sm">
+                    <table className="w-full min-w-[720px] text-sm">
                       <thead className="border-b bg-slate-50 text-left text-xs uppercase text-slate-500">
                         <tr>
                           <th className="px-4 py-3">Date</th>
-                          <th className="px-4 py-3">Case</th>
+                          <th className="px-4 py-3">Insurance</th>
+                          <th className="px-4 py-3">Patient</th>
                           <th className="px-4 py-3 text-right">Recovered</th>
                           <th className="px-4 py-3 text-right">Commission</th>
                         </tr>
@@ -523,9 +537,11 @@ export default function CommissionInvoiceDetailPage() {
                                 ? new Date(line.collectionDate).toLocaleDateString('en-KE')
                                 : '—'}
                             </td>
-                            <td className="max-w-[240px] px-4 py-3 text-slate-600">
-                              {line.creditorName}
-                              {line.debtorName ? ` · ${line.debtorName}` : ''}
+                            <td className="max-w-[200px] px-4 py-3 text-slate-600">
+                              {formatInvoiceLineInsurance(line)}
+                            </td>
+                            <td className="max-w-[200px] px-4 py-3 text-slate-900">
+                              {formatInvoiceLinePatient(line)}
                             </td>
                             <td className="px-4 py-3 text-right font-medium">
                               {formatKes(line.amountRecovered)}

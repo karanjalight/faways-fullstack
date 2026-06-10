@@ -455,6 +455,7 @@ create table if not exists public.commission_invoice_lines (
   commission_amount   numeric(18,2) not null,
   case_creditor       text,
   case_debtor         text,
+  case_insurance      text,
   collection_date     date,
   unique (debt_collection_id)
 );
@@ -480,6 +481,8 @@ alter table public.commission_invoice_lines
   add column if not exists case_debtor text;
 alter table public.commission_invoice_lines
   add column if not exists collection_date date;
+alter table public.commission_invoice_lines
+  add column if not exists case_insurance text;
 
 -- =========================
 -- RLS: collection proof metadata (required for uploads from the app)

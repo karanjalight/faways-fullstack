@@ -2,6 +2,7 @@
 
 import type { Client, RecoveryCommissionType } from '../types/client';
 import { supabase } from '@/lib/supabase-client';
+import { extractDebtInsuranceFromDescription } from './debts';
 
 export type CollectionInvoiceRow = {
   collectionId: string;
@@ -57,7 +58,8 @@ export async function fetchCollectionsForInvoice(): Promise<CollectionInvoiceRow
         id,
         client_id,
         creditor_name,
-        debtor_name
+        debtor_name,
+        description
       )
     `,
     )
@@ -80,12 +82,14 @@ export async function fetchCollectionsForInvoice(): Promise<CollectionInvoiceRow
           client_id: string | null;
           creditor_name: string | null;
           debtor_name: string | null;
+          description: string | null;
         }
       | {
           id: string;
           client_id: string | null;
           creditor_name: string | null;
           debtor_name: string | null;
+          description: string | null;
         }[]
       | null;
   };
@@ -100,7 +104,10 @@ export async function fetchCollectionsForInvoice(): Promise<CollectionInvoiceRow
         collectionId: r.id,
         collectionDate: r.collection_date,
         amount: Number(r.amount),
-        insuranceName: r.insurance_name,
+        insuranceName:
+          r.insurance_name?.trim() ||
+          extractDebtInsuranceFromDescription(debt.description) ||
+          null,
         debtId: r.debt_id,
         clientId: debt.client_id,
         creditorName: debt.creditor_name ?? '',

@@ -2,6 +2,7 @@
 'use client';
 
 import { Agent } from '../types/agent';
+import { formatKes } from '@/lib/format-kes';
 
 interface AgentDetailModalProps {
   isOpen: boolean;
@@ -19,15 +20,6 @@ export default function AgentDetailModal({
   onDelete,
 }: AgentDetailModalProps) {
   if (!isOpen || !agent) return null;
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -137,7 +129,7 @@ export default function AgentDetailModal({
                 Total Collected
               </label>
               <p className="mt-1 text-lg font-semibold text-green-600">
-                {formatCurrency(agent.totalCollected)}
+                {formatKes(agent.totalCollected)}
               </p>
             </div>
 
