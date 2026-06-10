@@ -376,12 +376,42 @@ export async function updateDebt(
   }
 }
 
-export async function deleteDebt(id: string): Promise<void> {
-  const { error } = await supabase.from('debts').delete().eq('id', id);
+export class DebtDeleteClientError extends Error {
+  readonly code: string;
+  readonly status: number;
 
-  if (error) {
-    console.error('Error deleting debt', error);
-    throw error;
+  constructor(message: string, code: string, status = 400) {
+    super(message);
+    this.name = 'DebtDeleteClientError';
+    this.code = code;
+    this.status = status;
   }
+}
+
+export async function deleteDebt(id: string): Promise<void> {
+  const response = await fetch(`/api/debts/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+
+  if (response.ok) return;
+
+  let payload: { error?: string; code?: string } = {};
+  try {
+    payload = (await response.json()) as { error?: string; code?: string };
+  } catch {
+    // ignore parse errors
+  }
+
+  const message =
+    payload.error ??
+    (response.status === 404
+      ? 'Debt not found. It may have already been deleted.'
+      : 'Failed to delete debt. Please try again.');
+
+  throw new DebtDeleteClientError(
+    message,
+    payload.code ?? 'DELETE_FAILED',
+    response.status,
+  );
 }
 

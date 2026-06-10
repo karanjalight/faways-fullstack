@@ -10,13 +10,19 @@ import DebtList from '../components/DebtList';
 import StatusPieChart from '../components/StatusPieChart';
 import DebtAmountBarChart from '../components/DebtAmountBarChart';
 import PriorityBarChart from '../components/PriorityBarChart';
-import { fetchDebts, updateDebt, deleteDebt as deleteDebtFromDb } from '../lib/debts';
+import {
+  fetchDebts,
+  updateDebt,
+  deleteDebt as deleteDebtFromDb,
+  DebtDeleteClientError,
+} from '../lib/debts';
 
 export default function DashboardPage() {
   const router = useRouter();
   const [debts, setDebts] = useState<Debt[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [user] = useState<{ name: string } | null>(null);
+  const [deletingDebtId, setDeletingDebtId] = useState<string | null>(null);
 
   useEffect(() => {
     const loadDebts = async () => {
@@ -89,14 +95,34 @@ export default function DashboardPage() {
   };
 
   const handleDeleteDebt = async (debtId: string) => {
-    if (!confirm('Are you sure you want to delete this debt?')) return;
+    const target = debts.find((debt) => debt.id === debtId);
+    if (!target) return;
 
+    const label = target.patientName || target.creditor || 'this debt';
+    if (
+      !confirm(
+        `Delete "${label}" permanently?\n\nThis removes all documents, collections, and related records. This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+
+    setDeletingDebtId(debtId);
+    const previousDebts = debts;
     setDebts((prev) => prev.filter((d) => d.id !== debtId));
 
     try {
       await deleteDebtFromDb(debtId);
     } catch (error) {
       console.error(error);
+      setDebts(previousDebts);
+      const message =
+        error instanceof DebtDeleteClientError
+          ? error.message
+          : 'Could not delete this debt. Please try again.';
+      alert(message);
+    } finally {
+      setDeletingDebtId(null);
     }
   };
 
@@ -235,6 +261,7 @@ export default function DashboardPage() {
             onEdit={(debt) => router.push(`/debts/${debt.id}`)}
             onStatusChange={handleStatusChange}
             onDelete={handleDeleteDebt}
+            deletingDebtId={deletingDebtId}
           />
         )}
         </div>

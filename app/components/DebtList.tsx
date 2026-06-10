@@ -12,6 +12,7 @@ interface DebtListProps {
   onEdit: (debt: Debt) => void;
   onStatusChange: (debtId: string, newStatus: DebtStatus) => void;
   onDelete?: (debtId: string) => void;
+  deletingDebtId?: string | null;
 }
 
 export default function DebtList({
@@ -19,6 +20,7 @@ export default function DebtList({
   onEdit,
   onStatusChange,
   onDelete,
+  deletingDebtId = null,
 }: DebtListProps) {
   const router = useRouter();
   const [filter, setFilter] = useState<DebtStatus | "all">("all");
@@ -324,9 +326,10 @@ export default function DebtList({
                             variant="ghost"
                             size="sm"
                             className="rounded-full px-3 text-xs text-rose-600 hover:bg-rose-50"
+                            disabled={deletingDebtId === debt.id}
                             onClick={() => onDelete(debt.id)}
                           >
-                            Remove
+                            {deletingDebtId === debt.id ? "Deleting…" : "Remove"}
                           </Button>
                         )}
                       </div>

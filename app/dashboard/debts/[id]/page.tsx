@@ -5,7 +5,12 @@ import { useRouter, useParams } from 'next/navigation';
 import DashboardLayout from '../../../components/DashboardLayout';
 import { Debt, DebtStatus, getRemainingAmount } from '../../../types/debt';
 import { getCurrentUser } from '../../../lib/auth';
-import { fetchDebtById, updateDebt, deleteDebt } from '../../../lib/debts';
+import {
+  fetchDebtById,
+  updateDebt,
+  deleteDebt,
+  DebtDeleteClientError,
+} from '../../../lib/debts';
 import { fetchAgents } from '../../../../lib/agents';
 import type { Agent } from '../../../types/agent';
 import {
@@ -51,6 +56,7 @@ export default function DebtDetailPage() {
   const [debt, setDebt] = useState<Debt | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [collections, setCollections] = useState<DebtCollection[]>([]);
   const [isCollectionsLoading, setIsCollectionsLoading] = useState(true);
   const [newCollectionAmount, setNewCollectionAmount] = useState('');
@@ -179,13 +185,41 @@ export default function DebtDetailPage() {
   };
 
   const handleDelete = async () => {
-    if (!debt) return;
-    if (!confirm('Are you sure you want to delete this debt?')) return;
+    if (!debt || isDeleting) return;
+
+    const extras: string[] = [];
+    if (collections.length > 0) {
+      extras.push(`${collections.length} collection(s)`);
+    }
+    if (debt.documents?.length) {
+      extras.push(`${debt.documents.length} document(s)`);
+    }
+    const extraNote =
+      extras.length > 0
+        ? `\n\nThis debt has ${extras.join(' and ')} that will also be removed.`
+        : '';
+
+    const label = debt.patientName || debt.creditor || 'this debt';
+    if (
+      !confirm(
+        `Delete "${label}" permanently?\n\nThis removes all related records and cannot be undone.${extraNote}`,
+      )
+    ) {
+      return;
+    }
+
+    setIsDeleting(true);
     try {
       await deleteDebt(debt.id);
       router.push('/debts');
     } catch (error) {
       console.error(error);
+      const message =
+        error instanceof DebtDeleteClientError
+          ? error.message
+          : 'Could not delete this debt. Please try again.';
+      alert(message);
+      setIsDeleting(false);
     }
   };
 
@@ -1122,9 +1156,10 @@ export default function DebtDetailPage() {
                     type="button"
                     variant="outline"
                     className="rounded-2xl text-rose-600 hover:bg-rose-50"
+                    disabled={isDeleting}
                     onClick={handleDelete}
                   >
-                    Delete
+                    {isDeleting ? 'Deleting…' : 'Delete'}
                   </Button>
                   <Button
                     type="button"
