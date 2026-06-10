@@ -390,6 +390,82 @@ export async function uploadCommissionInvoiceDocument(
   }
 }
 
+export class CommissionInvoiceClientError extends Error {
+  readonly code: string;
+  readonly status: number;
+
+  constructor(message: string, code: string, status = 400) {
+    super(message);
+    this.name = 'CommissionInvoiceClientError';
+    this.code = code;
+    this.status = status;
+  }
+}
+
+async function parseInvoiceApiError(
+  response: Response,
+  fallback: string,
+): Promise<CommissionInvoiceClientError> {
+  let payload: { error?: string; code?: string } = {};
+  try {
+    payload = (await response.json()) as { error?: string; code?: string };
+  } catch {
+    // ignore
+  }
+
+  return new CommissionInvoiceClientError(
+    payload.error ?? fallback,
+    payload.code ?? 'REQUEST_FAILED',
+    response.status,
+  );
+}
+
+export async function deleteCommissionInvoice(invoiceId: string): Promise<void> {
+  const response = await fetch(`/api/invoices/${encodeURIComponent(invoiceId)}`, {
+    method: 'DELETE',
+  });
+
+  if (response.ok) return;
+
+  throw await parseInvoiceApiError(
+    response,
+    response.status === 404
+      ? 'Invoice not found. It may have already been deleted.'
+      : 'Failed to delete invoice. Please try again.',
+  );
+}
+
+export type MergeCommissionInvoicesResponse = {
+  success: boolean;
+  mergedInvoiceId: string;
+  mergedReference: string;
+  removedInvoiceIds: string[];
+  removedReferences: string[];
+  lineCount: number;
+  totalRecovered: number;
+  totalCommission: number;
+};
+
+export async function mergeCommissionInvoices(
+  invoiceIds: string[],
+  targetInvoiceId?: string,
+): Promise<MergeCommissionInvoicesResponse> {
+  const response = await fetch('/api/invoices/merge', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ invoiceIds, targetInvoiceId }),
+  });
+
+  if (response.ok) {
+    return (await response.json()) as MergeCommissionInvoicesResponse;
+  }
+
+  throw await parseInvoiceApiError(
+    response,
+    'Failed to merge invoices. Please try again.',
+  );
+}
+
 export async function deleteCommissionInvoiceDocument(documentId: string): Promise<void> {
   const { data: row, error: fetchError } = await supabase
     .from('commission_invoice_documents')

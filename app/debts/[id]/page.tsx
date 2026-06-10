@@ -11,6 +11,10 @@ import {
   deleteDebt,
   DebtDeleteClientError,
 } from '../../lib/debts';
+import {
+  deleteDebtDocument,
+  fetchDebtDocumentsWithUrls,
+} from '../../lib/debtDocuments';
 import { fetchAgents } from '../../../lib/agents';
 import type { Agent } from '../../types/agent';
 import { Button } from '@/components/ui/button';
@@ -30,7 +34,18 @@ export default function DebtDetailPage({ params }: DebtDetailPageProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [removingDocId, setRemovingDocId] = useState<string | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
+
+  const refreshDocuments = async () => {
+    if (!params.id) return;
+    try {
+      const documents = await fetchDebtDocumentsWithUrls(params.id);
+      setDebt((prev) => (prev ? { ...prev, documents } : null));
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -88,6 +103,24 @@ export default function DebtDetailPage({ params }: DebtDetailPageProps) {
     }
   };
 
+  const handleRemoveDocument = async (documentId: string, label: string) => {
+    if (
+      !confirm(`Remove "${label}" from this debt? The file will be deleted permanently.`)
+    ) {
+      return;
+    }
+    setRemovingDocId(documentId);
+    try {
+      await deleteDebtDocument(documentId);
+      await refreshDocuments();
+    } catch (error) {
+      console.error(error);
+      alert('Could not remove that document. Try again or check your permissions.');
+    } finally {
+      setRemovingDocId(null);
+    }
+  };
+
   const handleDelete = async () => {
     if (!debt || isDeleting) return;
 
@@ -128,7 +161,7 @@ export default function DebtDetailPage({ params }: DebtDetailPageProps) {
                 {debt ? debt.patientName : 'Loading debt...'}
               </h1>
               <p className="mt-1 text-sm text-slate-500">
-                Review and update this case in one view.
+                Review and update this case. For recoveries and collections, open the full detail view.
               </p>
             </div>
             <div className="flex flex-col items-end gap-2">
@@ -355,6 +388,16 @@ export default function DebtDetailPage({ params }: DebtDetailPageProps) {
                           ) : (
                             <span className="text-xs text-amber-600">Unavailable</span>
                           )}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="rounded-xl border-rose-200 text-xs text-rose-600 hover:bg-rose-50"
+                            disabled={removingDocId === doc.id}
+                            onClick={() => handleRemoveDocument(doc.id, doc.name)}
+                          >
+                            {removingDocId === doc.id ? 'Removing…' : 'Remove'}
+                          </Button>
                         </div>
                       </li>
                     ))}
@@ -363,13 +406,23 @@ export default function DebtDetailPage({ params }: DebtDetailPageProps) {
               </section>
 
               <div className="flex items-center justify-between">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => router.push('/debts')}
-                >
-                  Back to list
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => router.push('/debts')}
+                  >
+                    Back to list
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-2xl"
+                    onClick={() => router.push(`/dashboard/debts/${debt.id}`)}
+                  >
+                    Full detail (recoveries & tabs)
+                  </Button>
+                </div>
                 <div className="flex gap-3">
                   <Button
                     type="button"

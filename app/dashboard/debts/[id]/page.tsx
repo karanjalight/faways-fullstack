@@ -16,8 +16,11 @@ import type { Agent } from '../../../types/agent';
 import {
   fetchCollectionsForDebt,
   createCollection,
+  deleteCollection,
+  CollectionDeleteClientError,
   DebtCollection,
 } from '../../../lib/collections';
+import { fetchCollectionToInvoiceMap } from '../../../lib/commissionInvoices';
 import {
   deleteDebtDocument,
   fetchDebtDocumentsWithUrls,
@@ -78,6 +81,10 @@ export default function DebtDetailPage() {
   const [inlineCollectionFile, setInlineCollectionFile] = useState<File | null>(null);
   const [uploadingCollectionDocId, setUploadingCollectionDocId] = useState<string | null>(null);
   const [removingCollectionDocId, setRemovingCollectionDocId] = useState<string | null>(null);
+  const [deletingCollectionId, setDeletingCollectionId] = useState<string | null>(null);
+  const [collectionInvoiceMap, setCollectionInvoiceMap] = useState<
+    Map<string, { invoiceId: string; reference: string }>
+  >(new Map());
 
   const refreshDocuments = async () => {
     if (!id) return;
@@ -150,9 +157,20 @@ export default function DebtDetailPage() {
       .catch(console.error);
   }, [collections]);
 
+  useEffect(() => {
+    fetchCollectionToInvoiceMap()
+      .then(setCollectionInvoiceMap)
+      .catch(console.error);
+  }, [collections]);
+
   const remaining = useMemo(
     () => (debt ? getRemainingAmount(debt) : 0),
     [debt],
+  );
+
+  const totalRecoveredFromCollections = useMemo(
+    () => collections.reduce((sum, collection) => sum + collection.amount, 0),
+    [collections],
   );
 
   const handleFieldChange = <K extends keyof Debt>(key: K, value: Debt[K]) => {
@@ -242,6 +260,147 @@ export default function DebtDetailPage() {
     'First Assurance',
     'Kenindia Assurance',
   ];
+
+  const handleDeleteCollection = async (collection: DebtCollection) => {
+    if (!debt || deletingCollectionId) return;
+
+    const invoiceLink = collectionInvoiceMap.get(collection.id);
+    const invoiceNote = invoiceLink
+      ? `\n\nThis recovery is on commission invoice ${invoiceLink.reference}. Deleting it will update or remove that invoice line.`
+      : '';
+
+    const docs = collectionDocsMap.get(collection.id) ?? [];
+    const docsNote =
+      docs.length > 0
+        ? `\n\n${docs.length} proof document(s) will also be deleted.`
+        : '';
+
+    if (
+      !confirm(
+        `Delete recovery of ${formatCurrency(collection.amount)} from ${new Date(collection.collectionDate).toLocaleDateString()}?${invoiceNote}${docsNote}\n\nThis cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+
+    setDeletingCollectionId(collection.id);
+    try {
+      const result = await deleteCollection(collection.id);
+
+      setCollections((prev) => prev.filter((entry) => entry.id !== collection.id));
+      setCollectionDocsMap((prev) => {
+        const next = new Map(prev);
+        next.delete(collection.id);
+        return next;
+      });
+      setCollectionInvoiceMap((prev) => {
+        const next = new Map(prev);
+        next.delete(collection.id);
+        return next;
+      });
+
+      setDebt({
+        ...debt,
+        paidAmount: result.paidAmount,
+        status: result.status as DebtStatus,
+      });
+    } catch (error) {
+      console.error(error);
+      const message =
+        error instanceof CollectionDeleteClientError
+          ? error.message
+          : 'Could not delete this recovery. Please try again.';
+      alert(message);
+    } finally {
+      setDeletingCollectionId(null);
+    }
+  };
+
+  const renderRecoveryDeleteButton = (collection: DebtCollection, compact = false) => (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className={
+        compact
+          ? 'h-7 rounded-lg border-rose-200 text-[10px] text-rose-600 hover:bg-rose-50'
+          : 'rounded-xl border-rose-200 text-xs text-rose-600 hover:bg-rose-50'
+      }
+      disabled={deletingCollectionId === collection.id}
+      onClick={() => handleDeleteCollection(collection)}
+    >
+      {deletingCollectionId === collection.id ? 'Deleting…' : 'Delete'}
+    </Button>
+  );
+
+  const renderRecoveriesPanel = (variant: 'overview' | 'financials' | 'compact') => (
+    <div
+      className={
+        variant === 'financials'
+          ? 'space-y-4 rounded-2xl border border-slate-200 bg-slate-50/60 p-4'
+          : 'space-y-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-4'
+      }
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Recovered amounts
+          </p>
+          <p className="text-sm text-slate-600">
+            {collections.length} recovery record{collections.length === 1 ? '' : 's'} ·{' '}
+            {formatCurrency(totalRecoveredFromCollections)} total
+          </p>
+        </div>
+        {variant !== 'compact' && collections.length > 0 && (
+          <p className="text-xs text-slate-500">
+            Delete a recovery to adjust collected totals automatically.
+          </p>
+        )}
+      </div>
+
+      {isCollectionsLoading ? (
+        <p className="text-sm text-slate-500">Loading recoveries…</p>
+      ) : collections.length === 0 ? (
+        <p className="text-sm text-slate-500">No recoveries recorded yet.</p>
+      ) : (
+        <ul className="space-y-2">
+          {collections.map((collection) => {
+            const invoiceLink = collectionInvoiceMap.get(collection.id);
+            const docs = collectionDocsMap.get(collection.id) ?? [];
+            return (
+              <li
+                key={collection.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-slate-900">
+                    {formatCurrency(collection.amount)}
+                    <span className="ml-2 text-xs font-normal text-slate-500">
+                      {new Date(collection.collectionDate).toLocaleDateString()}
+                    </span>
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {collection.insuranceName || 'No insurer'}
+                    {collection.notes ? ` · ${collection.notes}` : ''}
+                  </p>
+                  {(invoiceLink || docs.length > 0) && (
+                    <p className="mt-1 text-[11px] text-slate-400">
+                      {invoiceLink ? `Invoice ${invoiceLink.reference}` : ''}
+                      {invoiceLink && docs.length > 0 ? ' · ' : ''}
+                      {docs.length > 0
+                        ? `${docs.length} proof file${docs.length === 1 ? '' : 's'}`
+                        : ''}
+                    </p>
+                  )}
+                </div>
+                {renderRecoveryDeleteButton(collection, variant === 'compact')}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
 
   const handleAddCollection = async () => {
     if (!debt || !id) return;
@@ -475,6 +634,9 @@ export default function DebtDetailPage() {
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
                     Collected {formatCurrency(debt.paidAmount)}
+                    {collections.length > 0
+                      ? ` · ${collections.length} recovery record${collections.length === 1 ? '' : 's'}`
+                      : ''}
                   </p>
                 </div>
                 <div className="rounded-2xl bg-white p-4 shadow-sm">
@@ -573,6 +735,8 @@ export default function DebtDetailPage() {
                         }
                       />
                     </div>
+
+                    {renderRecoveriesPanel('overview')}
                   </TabsContent>
 
                   {/* Financials */}
@@ -657,6 +821,8 @@ export default function DebtDetailPage() {
                         </select>
                       </div>
                     </div>
+
+                    {renderRecoveriesPanel('financials')}
                   </TabsContent>
 
                   {/* Activity / Collections */}
@@ -693,6 +859,9 @@ export default function DebtDetailPage() {
                                   </th>
                                   <th className="min-w-[200px] px-4 py-3 text-left">
                                     Proof / documents
+                                  </th>
+                                  <th className="px-4 py-3 text-left">
+                                    Actions
                                   </th>
                                 </tr>
                               </thead>
@@ -815,6 +984,16 @@ export default function DebtDetailPage() {
                                               + Add proof
                                             </Button>
                                           )}
+                                        </div>
+                                      </td>
+                                      <td className="px-4 py-2 align-top">
+                                        <div className="space-y-1">
+                                          {collectionInvoiceMap.get(c.id) && (
+                                            <p className="text-[10px] text-slate-400">
+                                              {collectionInvoiceMap.get(c.id)?.reference}
+                                            </p>
+                                          )}
+                                          {renderRecoveryDeleteButton(c, true)}
                                         </div>
                                       </td>
                                     </tr>

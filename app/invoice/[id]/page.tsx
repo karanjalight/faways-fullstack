@@ -7,6 +7,8 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import DashboardLayout from '../../components/DashboardLayout';
 import {
+  CommissionInvoiceClientError,
+  deleteCommissionInvoice,
   deleteCommissionInvoiceDocument,
   fetchCommissionInvoiceDetail,
   updateCommissionInvoicePayment,
@@ -52,6 +54,7 @@ export default function CommissionInvoiceDetailPage() {
   const [docFile, setDocFile] = useState<File | null>(null);
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [removingDocId, setRemovingDocId] = useState<string | null>(null);
+  const [deletingInvoice, setDeletingInvoice] = useState(false);
 
   const load = async () => {
     if (!id) return;
@@ -125,6 +128,39 @@ export default function CommissionInvoiceDetailPage() {
       alert('Upload failed. Ensure the commission-invoice-documents bucket exists and policies allow upload.');
     } finally {
       setUploadingDoc(false);
+    }
+  };
+
+  const handleDeleteInvoice = async () => {
+    if (!id || !detail || deletingInvoice) return;
+
+    if (detail.status === 'paid') {
+      alert('Mark this invoice as unpaid before deleting it.');
+      return;
+    }
+
+    if (
+      !confirm(
+        `Delete invoice ${detail.reference} permanently?\n\n` +
+          `${detail.lines.length} collection line(s) will become uninvoiced again. ` +
+          `Attachments will be removed. This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+
+    setDeletingInvoice(true);
+    try {
+      await deleteCommissionInvoice(id);
+      router.push('/invoice/saved');
+    } catch (e) {
+      console.error(e);
+      const message =
+        e instanceof CommissionInvoiceClientError
+          ? e.message
+          : 'Could not delete this invoice.';
+      alert(message);
+      setDeletingInvoice(false);
     }
   };
 
@@ -268,6 +304,16 @@ export default function CommissionInvoiceDetailPage() {
                 </Button>
                 <Button type="button" className="rounded-xl" onClick={exportInvoicePdf}>
                   Download PDF
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-xl border-rose-200 text-rose-700 hover:bg-rose-50"
+                  disabled={deletingInvoice || detail.status === 'paid'}
+                  title={detail.status === 'paid' ? 'Mark unpaid before deleting' : 'Delete invoice'}
+                  onClick={handleDeleteInvoice}
+                >
+                  {deletingInvoice ? 'Deleting…' : 'Delete invoice'}
                 </Button>
                 <Badge
                   className={

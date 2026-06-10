@@ -36,7 +36,7 @@ async function removeStoragePaths(
   }
 }
 
-async function recalculateClientTotals(
+export async function recalculateClientTotals(
   admin: SupabaseClient,
   clientId: string,
 ): Promise<void> {
@@ -59,7 +59,7 @@ async function recalculateClientTotals(
     .eq('id', clientId);
 }
 
-async function recalculateAgentTotals(
+export async function recalculateAgentTotals(
   admin: SupabaseClient,
   agentId: string,
 ): Promise<void> {
@@ -85,7 +85,7 @@ async function recalculateAgentTotals(
     .eq('id', agentId);
 }
 
-async function cleanupCommissionInvoicesForCollections(
+export async function cleanupCommissionInvoicesForCollections(
   admin: SupabaseClient,
   collectionIds: string[],
 ): Promise<string[]> {

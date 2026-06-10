@@ -90,3 +90,53 @@ export async function createCollection(input: {
   return mapRow(data as DebtCollectionRow);
 }
 
+export class CollectionDeleteClientError extends Error {
+  readonly code: string;
+  readonly status: number;
+
+  constructor(message: string, code: string, status = 400) {
+    super(message);
+    this.name = 'CollectionDeleteClientError';
+    this.code = code;
+    this.status = status;
+  }
+}
+
+export type DeleteCollectionResponse = {
+  success: boolean;
+  debtId: string;
+  paidAmount: number;
+  status: string;
+};
+
+export async function deleteCollection(
+  collectionId: string,
+): Promise<DeleteCollectionResponse> {
+  const response = await fetch(`/api/collections/${encodeURIComponent(collectionId)}`, {
+    method: 'DELETE',
+  });
+
+  if (response.ok) {
+    return (await response.json()) as DeleteCollectionResponse;
+  }
+
+  let payload: { error?: string; code?: string } = {};
+  try {
+    payload = (await response.json()) as { error?: string; code?: string };
+  } catch {
+    // ignore parse errors
+  }
+
+  const message =
+    payload.error ??
+    (response.status === 404
+      ? 'Recovery record not found. It may have already been deleted.'
+      : 'Failed to delete recovery. Please try again.');
+
+  throw new CollectionDeleteClientError(
+    message,
+    payload.code ?? 'DELETE_FAILED',
+    response.status,
+  );
+}
+

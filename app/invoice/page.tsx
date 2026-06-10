@@ -15,9 +15,12 @@ import {
   type CollectionInvoiceRow,
 } from '../lib/commissions';
 import {
+  CommissionInvoiceClientError,
   createCommissionInvoicesFromLineItems,
+  deleteCommissionInvoice,
   fetchCollectionToInvoiceMap,
   listCommissionInvoices,
+  mergeCommissionInvoices,
 } from '../lib/commissionInvoices';
 import { fetchCollectionDocumentsMap } from '../lib/collectionDocuments';
 import type { CollectionAttachment } from '../types/collectionDocument';
@@ -189,7 +192,10 @@ export default function InvoicePage({
   const [searchQuery, setSearchQuery] = useState('');
   const [invoiceStatusFilter, setInvoiceStatusFilter] = useState<'all' | 'paid' | 'unpaid'>('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<Set<string>>(new Set());
   const [creating, setCreating] = useState(false);
+  const [deletingInvoiceId, setDeletingInvoiceId] = useState<string | null>(null);
+  const [mergingInvoices, setMergingInvoices] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -382,6 +388,109 @@ export default function InvoicePage({
       { recovered: 0, commission: 0, paid: 0, unpaid: 0 },
     );
   }, [filteredInvoices]);
+
+  const selectedSavedInvoices = useMemo(
+    () => filteredInvoices.filter((invoice) => selectedInvoiceIds.has(invoice.id)),
+    [filteredInvoices, selectedInvoiceIds],
+  );
+
+  const toggleInvoiceSelection = (invoiceId: string) => {
+    setSelectedInvoiceIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(invoiceId)) next.delete(invoiceId);
+      else next.add(invoiceId);
+      return next;
+    });
+  };
+
+  const handleDeleteSavedInvoice = async (invoice: CommissionInvoiceSummary) => {
+    if (deletingInvoiceId) return;
+
+    if (
+      !confirm(
+        `Delete invoice ${invoice.reference}?\n\nCollections on this invoice will become uninvoiced again. Attachments will be removed. This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+
+    setDeletingInvoiceId(invoice.id);
+    try {
+      await deleteCommissionInvoice(invoice.id);
+      setSelectedInvoiceIds((prev) => {
+        const next = new Set(prev);
+        next.delete(invoice.id);
+        return next;
+      });
+      await refresh();
+    } catch (e) {
+      console.error(e);
+      const message =
+        e instanceof CommissionInvoiceClientError
+          ? e.message
+          : 'Could not delete this invoice.';
+      alert(message);
+    } finally {
+      setDeletingInvoiceId(null);
+    }
+  };
+
+  const handleMergeSavedInvoices = async () => {
+    if (mergingInvoices || selectedSavedInvoices.length < 2) return;
+
+    const clientNames = [...new Set(selectedSavedInvoices.map((inv) => inv.clientName ?? 'No client'))];
+    if (clientNames.length > 1) {
+      alert('Selected invoices must belong to the same client to merge.');
+      return;
+    }
+
+    const paid = selectedSavedInvoices.filter((inv) => inv.status === 'paid');
+    if (paid.length > 0) {
+      alert('Paid invoices cannot be merged. Mark them unpaid first.');
+      return;
+    }
+
+    const sorted = [...selectedSavedInvoices].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    );
+    const keep = sorted[0];
+    const remove = sorted.slice(1);
+    const combinedRecovered = selectedSavedInvoices.reduce((sum, inv) => sum + inv.totalRecovered, 0);
+    const combinedCommission = selectedSavedInvoices.reduce((sum, inv) => sum + inv.totalCommission, 0);
+
+    if (
+      !confirm(
+        `Merge ${selectedSavedInvoices.length} invoices into ${keep.reference}?\n\n` +
+          `Client: ${clientNames[0]}\n` +
+          `Combined recovered: ${formatKes(combinedRecovered)}\n` +
+          `Combined commission: ${formatKes(combinedCommission)}\n\n` +
+          `These invoices will be removed:\n${remove.map((inv) => `• ${inv.reference}`).join('\n')}\n\n` +
+          `All line items and attachments will move to ${keep.reference}.`,
+      )
+    ) {
+      return;
+    }
+
+    setMergingInvoices(true);
+    try {
+      const result = await mergeCommissionInvoices(
+        selectedSavedInvoices.map((inv) => inv.id),
+        keep.id,
+      );
+      setSelectedInvoiceIds(new Set());
+      await refresh();
+      router.push(`/invoice/${result.mergedInvoiceId}`);
+    } catch (e) {
+      console.error(e);
+      const message =
+        e instanceof CommissionInvoiceClientError
+          ? e.message
+          : 'Could not merge invoices.';
+      alert(message);
+    } finally {
+      setMergingInvoices(false);
+    }
+  };
 
   const selectedItems = useMemo(() => {
     return dateFilteredCollectionLines.filter(
@@ -966,19 +1075,46 @@ export default function InvoicePage({
             {showInvoices ? (
             <Card className="overflow-hidden rounded-xl border-slate-200 shadow-sm">
               <CardHeader className="border-b border-slate-100 bg-violet-50/60 pb-4">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                   <div>
                     <CardTitle className="text-lg font-semibold">3. Saved invoices</CardTitle>
-                    <CardDescription>Formal commission invoices generated for clients.</CardDescription>
+                    <CardDescription>
+                      Formal commission invoices. Select multiple unpaid invoices for the same client to merge.
+                    </CardDescription>
                   </div>
-                  <p className="text-xs text-slate-500">{invoiceTotals.paid} paid, {invoiceTotals.unpaid} unpaid</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-xs text-slate-500">{invoiceTotals.paid} paid, {invoiceTotals.unpaid} unpaid</p>
+                    {selectedInvoiceIds.size > 0 ? (
+                      <>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="rounded-lg text-xs"
+                          onClick={() => setSelectedInvoiceIds(new Set())}
+                        >
+                          Clear ({selectedInvoiceIds.size})
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="rounded-lg text-xs"
+                          disabled={selectedSavedInvoices.length < 2 || mergingInvoices}
+                          onClick={handleMergeSavedInvoices}
+                        >
+                          {mergingInvoices ? 'Merging…' : `Merge selected (${selectedSavedInvoices.length})`}
+                        </Button>
+                      </>
+                    ) : null}
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[880px] text-sm">
+                  <table className="w-full min-w-[960px] text-sm">
                     <thead className="border-b border-slate-200 bg-slate-100 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-600">
                       <tr>
+                        <th className="w-10 px-3 py-3 print:hidden" aria-label="Select invoice" />
                         <th className="px-3 py-3">Date</th>
                         <th className="px-3 py-3">Invoice</th>
                         <th className="px-3 py-3">Client</th>
@@ -991,10 +1127,20 @@ export default function InvoicePage({
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {filteredInvoices.length === 0 ? (
-                        <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-500">No saved invoices match these filters.</td></tr>
+                        <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-500">No saved invoices match these filters.</td></tr>
                       ) : (
                         filteredInvoices.map((invoice) => (
                           <tr key={invoice.id} className="transition-colors hover:bg-violet-50/50">
+                            <td className="px-3 py-3 print:hidden">
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 rounded border-slate-300"
+                                checked={selectedInvoiceIds.has(invoice.id)}
+                                disabled={invoice.status === 'paid'}
+                                title={invoice.status === 'paid' ? 'Paid invoices cannot be merged' : 'Select for merge'}
+                                onChange={() => toggleInvoiceSelection(invoice.id)}
+                              />
+                            </td>
                             <td className="whitespace-nowrap px-3 py-3 text-slate-700">{new Date(invoice.createdAt).toLocaleDateString('en-KE')}</td>
                             <td className="px-3 py-3"><span className="font-mono text-xs font-semibold text-slate-900">{invoice.reference}</span></td>
                             <td className="px-3 py-3 text-slate-900">{invoice.clientName ?? <span className="text-slate-400">No client</span>}</td>
@@ -1007,7 +1153,20 @@ export default function InvoicePage({
                               </Badge>
                             </td>
                             <td className="px-3 py-3 print:hidden">
-                              <Button type="button" variant="outline" size="sm" className="rounded-lg text-xs" onClick={() => router.push(`/invoice/${invoice.id}`)}>Open</Button>
+                              <div className="flex flex-wrap gap-1">
+                                <Button type="button" variant="outline" size="sm" className="rounded-lg text-xs" onClick={() => router.push(`/invoice/${invoice.id}`)}>Open</Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="rounded-lg border-rose-200 text-xs text-rose-700 hover:bg-rose-50"
+                                  disabled={deletingInvoiceId === invoice.id || invoice.status === 'paid'}
+                                  title={invoice.status === 'paid' ? 'Mark unpaid before deleting' : 'Delete invoice'}
+                                  onClick={() => handleDeleteSavedInvoice(invoice)}
+                                >
+                                  {deletingInvoiceId === invoice.id ? 'Deleting…' : 'Delete'}
+                                </Button>
+                              </div>
                             </td>
                           </tr>
                         ))

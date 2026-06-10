@@ -48,11 +48,11 @@ export default function LandingNav() {
         <div className="max-w-7xl mx-auto px-6 py-2.5 flex items-center justify-between">
           <div className="flex items-center gap-6">
             <a
-              href="tel:+254700000000"
+              href="tel:+254729806234"
               className="flex items-center gap-2 hover:text-[#C9A34F] transition-colors"
             >
               <Phone className="w-3.5 h-3.5 text-[#C9A34F]" />
-              +254 700 000 000
+              0729 806 234
             </a>
             <a
               href="mailto:info@fawayssolutions.co.ke"

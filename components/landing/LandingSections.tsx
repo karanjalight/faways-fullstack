@@ -220,7 +220,7 @@ export function StatsSection() {
     { value: 12, suffix: "+", label: "Years of Excellence" },
     { value: 500, suffix: "+", label: "Clients Served" },
     { value: 98, suffix: "%", label: "Recovery Success Rate" },
-    { value: 5, suffix: "+", label: "Cities Covered" },
+    { value: 6, suffix: "+", label: "Cities Covered" },
   ];
 
   return (
@@ -473,7 +473,7 @@ const faqs = [
   },
   {
     q: "Which areas do you serve?",
-    a: "We serve clients across Nairobi, Kiambu, Mombasa, Nakuru, and Eldoret, with nationwide coverage for corporate clients.",
+    a: "We serve clients across Nairobi, Kiambu, Mombasa, Nakuru, Eldoret, and Kisumu, with nationwide coverage for corporate clients.",
   },
   {
     q: "What property management services do you offer?",
@@ -576,7 +576,7 @@ export function CTASection() {
             <ArrowRight className="w-4 h-4" />
           </Link>
           <Link
-            href="tel:+254700000000"
+            href="tel:+254729806234"
             className="inline-flex items-center gap-2 px-8 py-4 rounded-full border border-white/30 text-white font-medium hover:border-[#C9A34F] hover:bg-white/5 transition-colors"
           >
             <Phone className="w-4 h-4" />
@@ -682,7 +682,9 @@ export function LandingFooter() {
               <ul className="space-y-4 text-sm text-white/50">
                 <li className="flex items-start gap-3">
                   <Phone className="w-4 h-4 text-[#C9A34F] mt-0.5 flex-shrink-0" />
-                  +254 700 000 000
+                  <a href="tel:+254729806234" className="hover:text-[#C9A34F] transition-colors">
+                    0729 806 234
+                  </a>
                 </li>
                 <li className="flex items-start gap-3">
                   <Mail className="w-4 h-4 text-[#C9A34F] mt-0.5 flex-shrink-0" />
