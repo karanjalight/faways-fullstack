@@ -1,5 +1,4 @@
 import { SignupForm } from "@/components/signup-form";
-import { FieldDescription } from "@/components/ui/field";
 
 export default function SignupPage() {
   return (
@@ -7,16 +6,7 @@ export default function SignupPage() {
       <div className="flex flex-col gap-6 p-6 md:p-10 lg:px-16">
         <div className="flex flex-1 items-center justify-center ">
           <div className="w-full max-w-xl">
-            {/* <SignsupForm /> */}
-            <FieldDescription className="text-left text-xs">
-              Already have an account?{" "}
-              <a
-                href="/login"
-                className="font-medium underline underline-offset-4"
-              >
-                Log in
-              </a>
-            </FieldDescription>
+            <SignupForm />
           </div>
         </div>
       </div>
@@ -31,3 +21,4 @@ export default function SignupPage() {
     </div>
   );
 }
+
